@@ -64,6 +64,9 @@ export default function OfflineChecklist({ group }: { group: Group }) {
   return (
     <section className="rounded-xl bg-slate-900 p-4">
       <h2 className="font-semibold">Listo para usar sin señal</h2>
+      <p className="mt-1 text-sm text-slate-400">
+        En iPhone, ubicación y brújula se vuelven a pedir al abrir la app de nuevo. Es una regla de Apple y funciona sin señal: aceptá cuando aparezca.
+      </p>
       <ul className="mt-3 space-y-3">
         <Item ok={isStandalone()} label="App instalada">
           {canInstall && (
@@ -96,7 +99,7 @@ export default function OfflineChecklist({ group }: { group: Group }) {
         </Item>
         <Item ok={compassOk} label="Permiso de brújula">
           {denied ? (
-            <p className="mt-1 text-sm text-amber-200">Sin brújula, la flecha se orienta al caminar.</p>
+            <p className="mt-1 text-sm text-amber-200">Sin brújula, la flecha se orienta al caminar. Para activarla, cerrá la app del todo y volvé a abrirla.</p>
           ) : (
             <button type="button" className={actionClass} onClick={askCompass}>
               Dar permiso de brújula

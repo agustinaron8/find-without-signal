@@ -48,6 +48,7 @@ Mejoras de preparación: invitación con pasos, aviso en Safari, mapa automátic
 - [ ] Android (Chrome): lo mismo, con el botón Instalar.
 - [ ] Compartir por QR de iPhone a Android y viceversa, los dos sin red.
 - [ ] SMS: enviar desde A, pegar en B y navegar hacia ese punto.
+- [ ] iPhone en modo avión: cerrar la app, reabrirla y confirmar que los pedidos de ubicación y brújula aparecen y funcionan sin señal.
 - [ ] La pantalla no se apaga en el Modo Encuentro.
 - [ ] Brújula: guardar un punto, alejarse 100 m a pie y confirmar que la flecha apunta al punto, con el teléfono plano y levantado. Comparada con una brújula nativa magnética da unos 7° de diferencia, a propósito.
 - [ ] Instalar ya, cerrar todo, y el domingo abrir en modo avión: grupo, mapa y flecha siguen ahí.

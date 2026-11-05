@@ -256,7 +256,7 @@ export default function Meet() {
         <main className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
           {geoError === 'denied' && (
             <p role="alert" className="rounded-lg bg-red-100 p-3 font-semibold text-red-900">
-              Necesito permiso de ubicación. Activalo en los ajustes del teléfono para esta app.
+              Necesito permiso de ubicación. Cerrá la app del todo y volvé a abrirla para que lo pida de nuevo, o activalo en los ajustes del teléfono.
             </p>
           )}
           {geoError === 'unavailable' && (
@@ -328,6 +328,11 @@ export default function Meet() {
             </>
           )}
 
+          {denied && !arrived && (
+            <p data-testid="compass-denied" className="font-semibold text-amber-800">
+              Para usar la brújula, cerrá la app del todo, volvé a abrirla y tocá Permitir.
+            </p>
+          )}
           {needsPermission && (
             <button type="button" className="flex items-center gap-2 rounded-xl bg-sky-300 p-4 text-lg font-bold" onClick={requestPermission}>
               <CompassIcon size={24} /> Activar brújula
