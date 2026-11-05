@@ -10,7 +10,8 @@ type PermissionableOrientation = typeof DeviceOrientationEvent & {
 const orientationApi = () =>
   typeof DeviceOrientationEvent === 'undefined' ? undefined : (DeviceOrientationEvent as PermissionableOrientation);
 
-const screenAngle = () => screen.orientation?.angle ?? 0;
+// `window.orientation` goes first: WebKit can report an angle that contradicts its own orientation type.
+const screenAngle = () => (typeof window.orientation === 'number' ? window.orientation : (screen.orientation?.angle ?? 0));
 
 export function useHeading() {
   const [heading, setHeading] = useState<number | null>(null);

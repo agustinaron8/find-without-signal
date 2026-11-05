@@ -110,6 +110,17 @@ export function shouldRecordTrackPoint(
   return next.t - last.t >= TRACK_MIN_INTERVAL_MS && haversine(last, next) >= TRACK_MIN_DISTANCE_M;
 }
 
+const TRIP_MAX_GAP_MS = 12 * 60 * 60 * 1000;
+
+// Only a long silence ends a trip, so events spanning days keep their real starting point
+// while a test run at home the day before does not count as the start.
+export function currentTripStart<T extends { t: number }>(sortedPoints: T[]): T | undefined {
+  for (let i = sortedPoints.length - 1; i > 0; i--) {
+    if (sortedPoints[i].t - sortedPoints[i - 1].t > TRIP_MAX_GAP_MS) return sortedPoints[i];
+  }
+  return sortedPoints[0];
+}
+
 export function nextPlanTime(times: string[], now: Date): { time: string; minutes: number } | null {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const upcoming = times

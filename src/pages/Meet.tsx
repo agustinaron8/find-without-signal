@@ -13,6 +13,7 @@ import { useWakeLock } from '../hooks/useWakeLock';
 import {
   bearing,
   cardinalName,
+  currentTripStart,
   formatDistance,
   formatWalkTime,
   hasArrived,
@@ -29,8 +30,7 @@ const MapView = lazy(() => import('../components/MapView'));
 const TRACK_START_ID = 'track-start';
 const PERSONAL_COLOR = '#16a34a';
 const GPS_HEADING_MIN_SPEED_MS = 0.5;
-// A trip older than this is a previous outing, not the way back from today's.
-const TRACK_SESSION_MS = 12 * 60 * 60 * 1000;
+const TRACK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const buttonBase = 'flex items-center justify-center gap-2 rounded-xl p-2 font-semibold';
 const bigButton = `${buttonBase} bg-slate-200 text-slate-950`;
@@ -41,7 +41,7 @@ export default function Meet() {
   const group = useLiveQuery(() => db.groups.get(id).then((g) => g ?? null), [id]);
   const personal = useLiveQuery(() => db.personalPoints.where('groupId').equals(id).toArray(), [id]);
   const track = useLiveQuery(
-    () => db.trackPoints.where('t').above(Date.now() - TRACK_SESSION_MS).filter((p) => p.groupId === id).sortBy('t'),
+    () => db.trackPoints.where('t').above(Date.now() - TRACK_RETENTION_MS).filter((p) => p.groupId === id).sortBy('t'),
     [id],
   );
 
@@ -79,7 +79,7 @@ export default function Meet() {
     db.trackPoints.add(next);
   }, [position, track, id]);
 
-  const trackStart = track?.[0];
+  const trackStart = track && currentTripStart(track);
   const destinations = useMemo(() => {
     const list = (group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: p.description }));
     (personal ?? []).forEach((p) => list.push({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: undefined }));

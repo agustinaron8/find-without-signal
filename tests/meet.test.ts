@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   accuracyCircle,
+  currentTripStart,
   hasArrived,
   headingFromOrientation,
   nextPlanTime,
@@ -41,6 +42,21 @@ describe('shouldRecordTrackPoint', () => {
     expect(shouldRecordTrackPoint(start, { ...far, t: 5000, acc: 10 })).toBe(false);
     expect(shouldRecordTrackPoint(start, { ...start, t: 60000, acc: 10 })).toBe(false);
     expect(shouldRecordTrackPoint(start, { ...far, t: 15000, acc: 10 })).toBe(true);
+  });
+});
+
+describe('currentTripStart', () => {
+  const hours = (h: number) => ({ t: h * 60 * 60 * 1000 });
+  it('keeps the first point across a two-day event with short gaps', () => {
+    const points = [hours(0), hours(5), hours(11), hours(20), hours(30)];
+    expect(currentTripStart(points)).toBe(points[0]);
+  });
+  it('starts over after a long gap, such as a test at home the day before', () => {
+    const points = [hours(0), hours(1), hours(20), hours(25)];
+    expect(currentTripStart(points)).toBe(points[2]);
+  });
+  it('handles an empty track', () => {
+    expect(currentTripStart([])).toBeUndefined();
   });
 });
 

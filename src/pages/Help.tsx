@@ -60,7 +60,11 @@ export default function Help() {
             <li>Acordá el punto y los horarios antes de separarse. Es lo único que funciona seguro.</li>
             <li>Elegí puntos fáciles de reconocer y, si podés, en el borde del predio: el centro va a ser intransitable.</li>
             <li>Probá la app en modo avión antes de salir.</li>
-            <li>Llevá batería externa: el GPS con la pantalla prendida consume mucho.</li>
+            <li>
+              Si el evento dura más de un día, cerrá el Modo Encuentro cuando no lo necesites: con la pantalla prendida y el GPS,
+              la batería se va rápido. Llevá batería externa. Tus grupos y el mapa quedan guardados.
+            </li>
+            <li>En iPhone, usá siempre la app instalada y no borres los datos de Safari ni la app antes de que termine el evento.</li>
             <li>Sin señal, el GPS puede tardar hasta un minuto en ubicarte la primera vez.</li>
             <li>La brújula se confunde cerca de metal e imanes. Alejá el teléfono de otros aparatos y confirmá con la distancia: si baja, vas bien.</li>
           </ul>
