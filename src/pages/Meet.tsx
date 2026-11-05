@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Bookmark, ClipboardPaste, Compass as CompassIcon, Flashlight, Map as MapIcon, MessageSquare, Undo2, Users } from 'lucide-react';
+import { ArrowLeft, Bookmark, ClipboardPaste, Compass as CompassIcon, Flashlight, Map as MapIcon, MessageSquare, RotateCcw, Undo2, Users } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Compass from '../components/Compass';
@@ -192,6 +192,17 @@ export default function Meet() {
     setSheet(null);
   };
 
+  const resetTrack = async () => {
+    if (!window.confirm('¿Borrar la línea de tu recorrido? "Donde arranqué" pasa a ser el lugar donde estás ahora.')) return;
+    await db.trackPoints.where('groupId').equals(id).delete();
+    lastTrackRef.current = undefined;
+    // Otherwise the arrow would point to the new start, which is right here.
+    if (destinationId === TRACK_START_ID) {
+      setDestinationId(null);
+      localStorage.removeItem(storageKey);
+    }
+  };
+
   const saveHere = () => {
     if (!position) return setSheetError('Todavía no tengo tu ubicación.');
     savePersonal(draftName.trim() || 'Mi lugar', position.lat, position.lng, position.accuracy);
@@ -364,6 +375,11 @@ export default function Meet() {
               {poorFix && '≈ '}
               {formatDistance(distance)} · {formatWalkTime(distance)}
             </p>
+          )}
+          {!!track?.length && (
+            <button type="button" className="mt-2 flex items-center justify-center gap-2 self-center p-2 font-semibold underline" onClick={resetTrack}>
+              <RotateCcw size={18} /> Reiniciar recorrido
+            </button>
           )}
         </main>
       )}
