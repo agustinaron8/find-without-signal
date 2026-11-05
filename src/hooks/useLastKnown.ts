@@ -43,6 +43,7 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     if (!groupId) return undefined;
     let cancelled = false;
     let inFlight = false;
+    let rerun = false;
     let failures = 0;
     let timer: number | undefined;
 
@@ -72,7 +73,12 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     };
 
     const run = async () => {
-      if (cancelled || inFlight || document.hidden) return;
+      if (cancelled || document.hidden) return;
+      // Asked during an exchange (opt-in, first GPS fix): that one already read stale values.
+      if (inFlight) {
+        rerun = true;
+        return;
+      }
       window.clearTimeout(timer);
       inFlight = true;
       setSyncing(true);
@@ -92,6 +98,11 @@ export function useLastKnown(group: Group | null | undefined, position: Position
       setFailing(!ok);
       if (ok) setLastSync(Date.now());
       failures = ok ? 0 : failures + 1;
+      if (rerun) {
+        rerun = false;
+        run();
+        return;
+      }
       timer = window.setTimeout(run, nextSyncDelay(failures));
     };
     runRef.current = run;
