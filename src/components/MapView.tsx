@@ -73,9 +73,14 @@ export default function MapView({ points, draggable, onTap, onDragPoint, classNa
       if ((e.originalEvent.target as Element).closest('.maplibregl-marker')) return;
       callbacksRef.current.onTap?.(e.lngLat.lat, e.lngLat.lng);
     });
+    let styleLoaded = false;
+    map.on('style.load', () => {
+      styleLoaded = true;
+    });
     map.on('load', () => setFailed(false));
-    map.on('error', () => {
-      if (!map.isStyleLoaded()) setFailed(true);
+    map.on('error', (e: { sourceId?: string; tile?: unknown }) => {
+      // A missing tile only leaves a blank patch; a missing style or tileset means no map at all.
+      if (!styleLoaded || (e.sourceId && !e.tile)) setFailed(true);
     });
 
     return () => {

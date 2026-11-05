@@ -3,6 +3,7 @@ import { QrCode, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import OfflineMapCard from '../components/OfflineMapCard';
 import QRCode from '../components/QRCode';
 import { db, deleteGroup } from '../db';
 import { buildShareUrl } from '../lib/share';
@@ -58,6 +59,8 @@ export default function GroupDetail() {
         >
           MODO ENCUENTRO
         </Link>
+
+        <OfflineMapCard group={group} />
 
         {group.plan && (
           <section className="rounded-xl bg-slate-900 p-4">
