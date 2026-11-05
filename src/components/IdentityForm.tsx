@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db, type Group } from '../db';
-import { createJoinedMember, filterMembers, MAX_MEMBER_NAME, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
+import { createJoinedMember, filterMembers, MAX_MEMBER_NAME, MAX_MEMBER_PHONE, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 export default function IdentityForm({ group, dark = false }: { group: Group; dark?: boolean }) {
   const [name, setName] = useState('');
@@ -30,7 +30,7 @@ export default function IdentityForm({ group, dark = false }: { group: Group; da
         </div>
       )}
       <input aria-label="Tu nombre" maxLength={MAX_MEMBER_NAME} placeholder={group.members.length ? 'Si no estás, escribí tu nombre y apellido' : 'Tu nombre y apellido'} className={input} value={name} onChange={(e) => setName(e.target.value)} />
-      <input aria-label="Tu teléfono" type="tel" placeholder="Tu teléfono (opcional, para SMS)" className={input} value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <input aria-label="Tu teléfono" type="tel" maxLength={MAX_MEMBER_PHONE} placeholder="Tu teléfono (opcional, para SMS)" className={input} value={phone} onChange={(e) => setPhone(e.target.value)} />
       <button type="button" disabled={!name.trim()} className={submit} onClick={join}>
         Unirme con este nombre
       </button>

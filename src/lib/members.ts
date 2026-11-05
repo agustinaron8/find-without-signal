@@ -76,11 +76,12 @@ export function parseMemberList(text: string, existing: ParsedMember[] = []): Pa
 
 export const MEMBER_COLORS = ['#38bdf8', '#fbbf24', '#f472b6', '#34d399', '#a78bfa', '#fb923c', '#f87171', '#a3e635'];
 export const MAX_MEMBER_NAME = 40;
+export const MAX_MEMBER_PHONE = 25;
 
 export function createJoinedMember(name: string, phone = ''): Member {
   const id = crypto.randomUUID();
   const color = MEMBER_COLORS[parseInt(id.slice(0, 2), 16) % MEMBER_COLORS.length];
-  return { id, name: name.trim().slice(0, MAX_MEMBER_NAME), color, joined: true, ...(phone.trim() ? { phone: phone.trim() } : {}) };
+  return { id, name: name.trim().slice(0, MAX_MEMBER_NAME), color, joined: true, ...(phone.trim() ? { phone: phone.trim().slice(0, MAX_MEMBER_PHONE) } : {}) };
 }
 
 // Whoever joined by link is not in the shared list: they are known by the location they send.

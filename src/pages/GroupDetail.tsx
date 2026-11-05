@@ -7,6 +7,7 @@ import OfflineChecklist from '../components/OfflineChecklist';
 import OfflineMapCard from '../components/OfflineMapCard';
 import QRCode from '../components/QRCode';
 import { db, deleteGroup } from '../db';
+import { forgetSharedLocation } from '../lib/lastKnown';
 import { buildInvitation, buildShareUrl } from '../lib/share';
 
 export default function GroupDetail() {
@@ -28,6 +29,7 @@ export default function GroupDetail() {
 
   const remove = async () => {
     if (!window.confirm(`¿Borrar "${group.name}" de este teléfono?`)) return;
+    await forgetSharedLocation(group.id).catch(() => undefined);
     await deleteGroup(group.id);
     navigate('/', { replace: true });
   };

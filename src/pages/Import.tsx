@@ -6,8 +6,8 @@ import Header from '../components/Header';
 import QRScanner from '../components/QRScanner';
 import { db } from '../db';
 import { isIOSBrowser } from '../lib/platform';
-import { createJoinedMember, filterMembers, MAX_MEMBER_NAME, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
-import { sharingKey } from '../lib/lastKnown';
+import { createJoinedMember, filterMembers, MAX_MEMBER_NAME, MAX_MEMBER_PHONE, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
+import { OFF_PENDING, sharingKey } from '../lib/lastKnown';
 import { buildShareUrl, decodeGroup, extractPayload, mergeImportedGroup, type SharedGroup } from '../lib/share';
 
 const INVALID_MESSAGE = 'Ese código no es un grupo de Reencuentro válido.';
@@ -51,6 +51,11 @@ export default function Import() {
     if (existing?.myMemberId) setMyMemberId(existing.myMemberId);
   }, [existing?.myMemberId]);
 
+  // Re-importing must show the real state, or leaving it untouched would change what this phone shares.
+  useEffect(() => {
+    if (group?.id) setShareLocation(localStorage.getItem(sharingKey(group.id)) === '1');
+  }, [group?.id]);
+
   const iosSafariGate = isIOSBrowser() && !stayInSafari;
 
   const copyLink = async () => {
@@ -61,7 +66,9 @@ export default function Import() {
 
   const save = async () => {
     if (!group) return;
-    if (shareLocation) localStorage.setItem(sharingKey(group.id), '1');
+    const wasSharing = localStorage.getItem(sharingKey(group.id)) === '1';
+    if (shareLocation && (joinName.trim() || myMemberId)) localStorage.setItem(sharingKey(group.id), '1');
+    else if (wasSharing) localStorage.setItem(sharingKey(group.id), OFF_PENDING);
     if (joinName.trim()) {
       const member = createJoinedMember(joinName, joinPhone);
       const merged = mergeImportedGroup(group, existing);
@@ -127,6 +134,7 @@ export default function Import() {
                   <input
                     aria-label="Tu teléfono"
                     type="tel"
+                    maxLength={MAX_MEMBER_PHONE}
                     className="w-full rounded-lg bg-slate-800 p-3 text-base"
                     placeholder="Tu teléfono (opcional, para SMS)"
                     value={joinPhone}

@@ -36,6 +36,8 @@ export default function GroupEdit() {
   const [list, setList] = useState('');
   const [listStatus, setListStatus] = useState('');
   const [memberFilter, setMemberFilter] = useState('');
+  // Rows touched in this session stay put: hiding one mid-typing would lose the focus and the rest of the name.
+  const [touchedIds, setTouchedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (existing && !group) setGroup(existing);
@@ -46,6 +48,7 @@ export default function GroupEdit() {
   }
 
   const patch = (changes: Partial<Group>) => setGroup({ ...group, ...changes });
+  const touch = (memberId: string) => setTouchedIds((ids) => new Set(ids).add(memberId));
   const patchMember = (memberId: string, changes: Partial<Member>) =>
     patch({ members: group.members.map((m) => (m.id === memberId ? { ...m, ...changes } : m)) });
   const patchPoint = (pointId: string, changes: Partial<MeetingPoint>) =>
@@ -121,11 +124,12 @@ export default function GroupEdit() {
 
   // A long list would push the meeting points far away, so it stays folded behind the search.
   const longList = group.members.length > MEMBER_FILTER_FROM;
+  const matching = new Set(filterMembers(group.members, memberFilter).map((m) => m.id));
   const shownMembers = !longList
     ? group.members
-    : memberFilter.trim()
-      ? filterMembers(group.members, memberFilter)
-      : group.members.filter((m) => !m.name.trim() || m.id === group.myMemberId);
+    : group.members.filter(
+        (m) => touchedIds.has(m.id) || !m.name.trim() || (memberFilter.trim() ? matching.has(m.id) : m.id === group.myMemberId),
+      );
 
   const save = async () => {
     if (!group.name.trim()) return setError('Ponele un nombre al grupo.');
@@ -178,6 +182,7 @@ export default function GroupEdit() {
                   className={inputClass}
                   placeholder="Nombre"
                   value={member.name}
+                  onFocus={() => touch(member.id)}
                   onChange={(e) => patchMember(member.id, { name: e.target.value })}
                 />
                 <button
@@ -195,6 +200,7 @@ export default function GroupEdit() {
                 className={inputClass}
                 placeholder="Teléfono (opcional, para SMS)"
                 value={member.phone ?? ''}
+                onFocus={() => touch(member.id)}
                 onChange={(e) => patchMember(member.id, { phone: e.target.value })}
               />
               <label className="flex items-center gap-2 text-sm">

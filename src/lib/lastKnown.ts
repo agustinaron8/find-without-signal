@@ -27,6 +27,9 @@ const sha256 = async (value: string) =>
   new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)));
 
 export const sharingKey = (groupId: string) => `share-location-${groupId}`;
+export const OFF_PENDING = 'off';
+// Who this phone last published as, so that entry can be removed even if the identity changes later.
+export const sharedAsKey = (groupId: string) => `shared-as-${groupId}`;
 
 export interface LocationKeys {
   channel: string;
@@ -59,7 +62,19 @@ export interface LocationFix {
 
 export async function encryptLocation(key: CryptoKey, fix: LocationFix): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const plain = encoder.encode(JSON.stringify({ i: fix.memberId, a: fix.lat, o: fix.lng, c: Math.round(fix.acc), t: fix.t, n: fix.name, k: fix.color, p: fix.phone }));
+  // Names can be longer when they come from a list, and the server limits the size of what it stores.
+  const plain = encoder.encode(
+    JSON.stringify({
+      i: fix.memberId,
+      a: fix.lat,
+      o: fix.lng,
+      c: Math.round(fix.acc),
+      t: fix.t,
+      n: fix.name?.slice(0, MAX_MEMBER_NAME),
+      k: fix.color,
+      p: fix.phone && PHONE.test(fix.phone) ? fix.phone : undefined,
+    }),
+  );
   const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
   const out = new Uint8Array(IV_BYTES + cipher.length);
   out.set(iv);
@@ -139,6 +154,26 @@ export function newestLocations(
     updates.set(fix.memberId, { groupId, ...fix });
   }
   return [...updates.values()];
+}
+
+// Must start synchronously: an iPhone can freeze the page right after it reports the lock.
+export function sendWithoutWaiting(channel: string, write: SyncWrite): void {
+  fetch(LOCATION_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ c: channel, ...write, w: 1 }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
+// Best effort when a group is deleted: what cannot be removed now expires on the server by itself.
+export async function forgetSharedLocation(groupId: string): Promise<void> {
+  const memberId = localStorage.getItem(sharedAsKey(groupId));
+  localStorage.removeItem(sharingKey(groupId));
+  localStorage.removeItem(sharedAsKey(groupId));
+  if (!memberId) return;
+  const { channel } = await deriveLocationKeys(groupId);
+  sendWithoutWaiting(channel, { m: await memberTag(channel, memberId), d: null });
 }
 
 export function formatAge(ms: number): string {

@@ -1,6 +1,6 @@
 import { CheckCircle2, Download, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { db, type Group } from '../db';
 import { useOnline } from '../hooks/useOnline';
 import { isIOSBrowser } from '../lib/platform';
@@ -18,7 +18,9 @@ const formatMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1).replace(
 
 export default function OfflineMapCard({ group }: { group: Group }) {
   const online = useOnline();
-  const autoStart = (useLocation().state as { autoDownloadMap?: boolean } | null)?.autoDownloadMap === true;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const autoStart = (location.state as { autoDownloadMap?: boolean } | null)?.autoDownloadMap === true;
   const autoStarted = useRef(false);
   const [marginKm, setMarginKm] = useState(DEFAULT_MARGIN_KM);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
@@ -39,8 +41,6 @@ export default function OfflineMapCard({ group }: { group: Group }) {
       active = false;
     };
   }, [area]);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
 
   const start = async () => {
     const plan = planArea(group.meetingPoints, marginKm);
@@ -75,6 +75,8 @@ export default function OfflineMapCard({ group }: { group: Group }) {
   useEffect(() => {
     if (!autoStart || autoStarted.current || !online || coversPoints || isIOSBrowser()) return;
     autoStarted.current = true;
+    // Consumed here so that going back or reloading never starts a download nobody asked for.
+    navigate(location.pathname, { replace: true, state: null });
     start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, online, coversPoints]);

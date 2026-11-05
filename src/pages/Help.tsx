@@ -84,7 +84,7 @@ export default function Help() {
           <p>
             No hay cuentas. Nada sale de tu teléfono salvo lo que compartís vos: el link, el QR, el SMS y, solo si lo activás en
             "Ubicación del grupo", tu ubicación. Esa viaja cifrada con una clave que tiene únicamente tu grupo: nuestro servidor no
-            puede leerla y se borra a los 3 días.
+            puede leerla. Se borra si lo apagás, o 3 días después del último envío del grupo.
           </p>
         </section>
         <p data-testid="app-version" className="text-center text-sm text-slate-500">

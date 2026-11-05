@@ -69,7 +69,7 @@ export default function GroupLocationsSheet({
             <span>
               <span className="block font-bold">Compartir mi ubicación con el grupo</span>
               <span className="block text-sm text-slate-700">
-                Se manda cada 3 minutos si hay algo de red, solo con esta pantalla abierta. Va cifrada y se borra a los 3 días.
+                Se manda cada 3 minutos si hay algo de red, solo con esta pantalla abierta. Va cifrada. Se borra si lo apagás, o 3 días después del último envío del grupo.
               </span>
             </span>
           </label>

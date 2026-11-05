@@ -52,8 +52,8 @@ describe('location crypto', () => {
 
   it('fits a long identity within what the server accepts', async () => {
     const { key } = await deriveLocationKeys(GROUP);
-    const data = await encryptLocation(key, { memberId: GROUP, lat: -31.123456789, lng: -64.123456789, acc: 9999, t: fix.t, name: 'ñ'.repeat(40), color: '#38bdf8', phone: '+54 9 351 123-4567' });
-    expect(data.length).toBeLessThanOrEqual(400);
+    const data = await encryptLocation(key, { memberId: GROUP, lat: -31.123456789, lng: -64.123456789, acc: 9999, t: fix.t, name: '漢'.repeat(200), color: '#38bdf8', phone: `+54 ${'9'.repeat(200)}` });
+    expect(data.length).toBeLessThanOrEqual(600);
   });
 
   it('rejects another group, tampering, garbage and far-future times', async () => {
@@ -183,6 +183,22 @@ describe('api/loc', () => {
     for (const body of bad) expect((await call(body)).status, JSON.stringify(body)).toBe(400);
     expect((await call({ c: C, m: M, d: 'c'.repeat(2000) })).status).toBe(413);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('skips the read on a write-only request, like the last send before locking', async () => {
+    const { fetchMock, store } = fakeRedis();
+    expect(await (await call({ c: C, m: M, d: D, w: 1 })).json()).toEqual({ e: {} });
+    expect(store.get(`loc:${C}`)?.get(M)).toBe(D);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string).some((c: string[]) => c[0] === 'HGETALL')).toBe(false);
+    expect((await call({ c: C, w: 1 })).status).toBe(400);
+  });
+
+  it('reports a failure when one command fails inside a successful response', async () => {
+    fakeRedis();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([{ error: 'quota' }, { result: [] }]))));
+    expect((await call({ c: C, m: M, d: null })).status).toBe(502);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>')));
+    expect((await call({ c: C })).status).toBe(502);
   });
 
   it('reports a failure when the database is down', async () => {

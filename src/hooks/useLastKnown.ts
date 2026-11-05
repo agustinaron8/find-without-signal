@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db, type Group } from '../db';
 import {
   decryptLocation,
@@ -10,6 +10,9 @@ import {
   memberTag,
   newestLocations,
   nextSyncDelay,
+  OFF_PENDING,
+  sendWithoutWaiting,
+  sharedAsKey,
   sharingKey,
   type SyncWrite,
 } from '../lib/lastKnown';
@@ -17,7 +20,8 @@ import type { Position } from './useGeolocation';
 
 // A worse fix would send people to the wrong side of the grounds.
 const MAX_SHARED_ACCURACY_M = 200;
-const OFF_PENDING = 'off';
+// The last send has to leave without waiting for encryption, so it stays ready.
+const PREPARE_EVERY_MS = 10 * 1000;
 
 export function useLastKnown(group: Group | null | undefined, position: Position | null) {
   const groupId = group?.id;
@@ -33,6 +37,7 @@ export function useLastKnown(group: Group | null | undefined, position: Position
   const latest = useRef({ group, position, sharing });
   latest.current = { group, position, sharing };
   const runRef = useRef<() => void>(() => undefined);
+  const prepared = useRef<{ channel: string; write: SyncWrite; at: number; me: string } | null>(null);
 
   useEffect(() => {
     if (groupId) setSharingState(localStorage.getItem(sharingKey(groupId)) === '1');
@@ -60,14 +65,26 @@ export function useLastKnown(group: Group | null | undefined, position: Position
       const { channel, key } = await deriveLocationKeys(groupId);
       const me = current.myMemberId;
       const pendingOff = localStorage.getItem(sharingKey(groupId)) === OFF_PENDING;
+      const sharedAs = localStorage.getItem(sharedAsKey(groupId));
+
+      // Changed identity while sharing: the old name must not stay behind as a stale location.
+      if (sharedAs && sharedAs !== me && !pendingOff) {
+        await exchangeLocations(channel, { m: await memberTag(channel, sharedAs), d: null });
+        localStorage.removeItem(sharedAsKey(groupId));
+      }
 
       let write = await locationWrite(channel, key);
-      if (!write && me && pendingOff) {
-        write = { m: await memberTag(channel, me), d: null };
+      const toRemove = sharedAs ?? me;
+      if (!write && toRemove && pendingOff) {
+        write = { m: await memberTag(channel, toRemove), d: null };
       }
 
       const entries = await exchangeLocations(channel, write);
-      if (pendingOff && write?.d === null) localStorage.removeItem(sharingKey(groupId));
+      if (write?.d && me) localStorage.setItem(sharedAsKey(groupId), me);
+      if (pendingOff && write?.d === null) {
+        localStorage.removeItem(sharingKey(groupId));
+        localStorage.removeItem(sharedAsKey(groupId));
+      }
 
       const fixes = (await Promise.all(entries.map((data) => decryptLocation(key, data)))).filter((f) => f !== null);
       const existing = await db.memberLocations.where('groupId').equals(groupId).toArray();
@@ -111,19 +128,13 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     runRef.current = run;
 
     // Web apps stop when the phone locks, so this is the last chance to leave a fresh location.
-    const flushBeforeLock = async () => {
-      try {
-        const { channel, key } = await deriveLocationKeys(groupId);
-        const write = await locationWrite(channel, key);
-        if (write) await exchangeLocations(channel, write, (url, init) => fetch(url, { ...init, keepalive: true }));
-      } catch {
-        // Nothing else can be done from here; the next exchange happens when the screen comes back.
-      }
-    };
-
     const onVisibility = () => {
-      if (document.hidden) flushBeforeLock();
-      else run();
+      if (!document.hidden) return void run();
+      const ready = prepared.current;
+      if (ready && latest.current.sharing && ready.me === latest.current.group?.myMemberId && navigator.onLine) {
+        localStorage.setItem(sharedAsKey(groupId), ready.me);
+        sendWithoutWaiting(ready.channel, ready.write);
+      }
     };
     run();
     document.addEventListener('visibilitychange', onVisibility);
@@ -137,11 +148,29 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     };
   }, [groupId]);
 
-  // The first exchange usually happens before the GPS has a fix.
-  const hasFix = !!position;
+  // The first exchange usually happens before the GPS has a fix good enough to share.
+  const canShareFix = !!position && position.accuracy <= MAX_SHARED_ACCURACY_M;
   useEffect(() => {
-    if (hasFix && sharing) runRef.current();
-  }, [hasFix, sharing]);
+    if (canShareFix && sharing) runRef.current();
+  }, [canShareFix, sharing]);
+
+  const myMemberId = group?.myMemberId;
+  useEffect(() => {
+    if (!sharing || !canShareFix || !groupId || !myMemberId) {
+      prepared.current = null;
+      return;
+    }
+    if (prepared.current?.me === myMemberId && Date.now() - prepared.current.at < PREPARE_EVERY_MS) return;
+    const { group: current, position: fix } = latest.current;
+    const me = current?.members.find((m) => m.id === myMemberId);
+    if (!me || !fix) return;
+    const at = Date.now();
+    (async () => {
+      const { channel, key } = await deriveLocationKeys(groupId);
+      const d = await encryptLocation(key, { memberId: me.id, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t, name: me.name, color: me.color, phone: me.phone });
+      prepared.current = { channel, write: { m: await memberTag(channel, me.id), d }, at, me: me.id };
+    })().catch(() => undefined);
+  }, [position, sharing, canShareFix, groupId, myMemberId]);
 
   const setSharing = useCallback(
     (value: boolean) => {
@@ -156,8 +185,14 @@ export function useLastKnown(group: Group | null | undefined, position: Position
 
   const syncNow = useCallback(() => runRef.current(), []);
 
-  const locations = (stored ?? []).filter(
-    (l) => l.memberId !== group?.myMemberId && Date.now() - l.t < LOCATION_MAX_AGE_MS && (!!l.name || group?.members.some((m) => m.id === l.memberId)),
+  // Memoized because the compass re-renders Meet many times per second, and a new array would rebuild the map.
+  const members = group?.members;
+  const locations = useMemo(
+    () =>
+      (stored ?? []).filter(
+        (l) => l.memberId !== myMemberId && Date.now() - l.t < LOCATION_MAX_AGE_MS && (!!l.name || members?.some((m) => m.id === l.memberId)),
+      ),
+    [stored, myMemberId, members],
   );
 
   return { locations, sharing, setSharing, lastSync, failing, syncing, syncNow };
