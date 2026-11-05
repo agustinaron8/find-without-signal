@@ -93,8 +93,91 @@ export function nextRotation(previous: number, target: number): number {
   return previous + delta;
 }
 
-export function hasArrived(distance: number, accuracy: number): boolean {
-  return !isPoorFix(accuracy) && distance <= Math.max(accuracy, 25);
+const ARRIVAL_MIN_M = 15;
+const ARRIVAL_EXIT_FACTOR = 1.5;
+
+// The wider exit radius keeps GPS jitter from flipping between the arrow and the arrival screen.
+export function hasArrived(distance: number, accuracy: number, wasArrived = false): boolean {
+  if (isPoorFix(accuracy)) return false;
+  const radius = Math.max(accuracy, ARRIVAL_MIN_M);
+  return distance <= (wasArrived ? radius * ARRIVAL_EXIT_FACTOR : radius);
+}
+
+export const SAVE_MAX_ACCURACY_M = 25;
+export const combinedAccuracy = (a: number, b = 0) => Math.hypot(a, b);
+
+// Signed shortest turn from b to a, in the range -180..180.
+export const angleBetween = (a: number, b: number) => ((a - b) % 360 + 540) % 360 - 180;
+
+const FADEA = { lat: -31.45, lng: -64.27 };
+const FADEA_DECLINATION = -7.1;
+const DECLINATION_RADIUS_M = 300000;
+
+// Compasses report magnetic north and bearings use true north. World Magnetic Model value for
+// November 2026; it stays within about 1.5° across the radius, and is not known outside it.
+export const magneticDeclination = (at: LatLng) => (haversine(at, FADEA) <= DECLINATION_RADIUS_M ? FADEA_DECLINATION : 0);
+
+const FOOT_SPEED_MS = 3;
+
+export interface Fix extends LatLng {
+  accuracy: number;
+  t: number;
+}
+
+// Weighs each fix by its accuracy, so a coarse cell fix cannot throw away a good GPS position.
+// The error only grows by what the person could have moved, and never drops below what the
+// phone reports: averaging does not remove the error from signals bouncing off nearby things.
+export function filterFix(previous: Fix | null, next: Fix, speed: number | null = null): Fix {
+  if (!previous) return next;
+  const seconds = Math.max(0, next.t - previous.t) / 1000;
+  const grown = previous.accuracy + Math.max(FOOT_SPEED_MS, speed ?? 0) * seconds;
+  const gain = grown ** 2 / (grown ** 2 + Math.max(next.accuracy, 1) ** 2);
+  return {
+    lat: previous.lat + gain * (next.lat - previous.lat),
+    lng: previous.lng + gain * (next.lng - previous.lng),
+    accuracy: Math.min(next.accuracy, grown),
+    t: next.t,
+  };
+}
+
+export const WALK_WINDOW_MS = 20000;
+const WALK_MIN_SPAN_MS = 5000;
+const WALK_MIN_DISTANCE_M = 12;
+const WALK_MIN_STRAIGHTNESS = 0.7;
+
+export interface WalkSample extends Fix {
+  heading: number | null;
+}
+
+export interface Walk {
+  course: number;
+  compassError: number | null;
+}
+
+// Where the person is really going, from their own positions: no magnet can disturb this.
+// The compass is averaged over the same window, so turning a corner does not read as an error.
+export function recentWalk(samples: WalkSample[]): Walk | null {
+  const last = samples[samples.length - 1];
+  if (!last) return null;
+  const recent = samples.filter((s) => last.t - s.t <= WALK_WINDOW_MS);
+  const first = recent[0];
+  if (last.t - first.t < WALK_MIN_SPAN_MS) return null;
+  const moved = haversine(first, last);
+  const worst = Math.max(first.accuracy, last.accuracy);
+  if (moved < Math.max(WALK_MIN_DISTANCE_M, worst * 1.5)) return null;
+  const path = recent.slice(1).reduce((sum, s, i) => sum + haversine(recent[i], s), 0);
+  if (moved / path < WALK_MIN_STRAIGHTNESS) return null;
+  const course = bearing(first, last);
+  const headings = recent.flatMap((s) => (s.heading === null ? [] : [s.heading]));
+  return { course, compassError: headings.length * 2 >= recent.length ? angleBetween(course, circularMean(headings)) : null };
+}
+
+export type WalkTrend = 'closer' | 'sideways' | 'away';
+
+export function walkTrend(course: number, toTarget: number): WalkTrend {
+  const off = Math.abs(angleBetween(course, toTarget));
+  if (off <= 60) return 'closer';
+  return off >= 120 ? 'away' : 'sideways';
 }
 
 const TRACK_MIN_INTERVAL_MS = 15000;
@@ -142,8 +225,10 @@ export function accuracyCircle(center: LatLng, radiusM: number, steps = 32): [nu
   });
 }
 
-interface OrientationReading {
+export interface OrientationReading {
   alpha: number | null;
+  beta?: number | null;
+  gamma?: number | null;
   absolute?: boolean;
   webkitCompassHeading?: number;
   webkitCompassAccuracy?: number;
@@ -154,6 +239,23 @@ export function headingFromOrientation(event: OrientationReading, screenAngle: n
     if ((event.webkitCompassAccuracy ?? 0) < 0) return null;
     return normalizeDegrees(event.webkitCompassHeading + screenAngle);
   }
-  if (event.absolute && typeof event.alpha === 'number') return normalizeDegrees(360 - event.alpha + screenAngle);
-  return null;
+  if (!event.absolute || typeof event.alpha !== 'number') return null;
+  if (typeof event.beta !== 'number' || typeof event.gamma !== 'number') return normalizeDegrees(360 - event.alpha + screenAngle);
+  return headingFromAngles(event.alpha, event.beta, event.gamma, screenAngle);
+}
+
+// Alpha alone is wrong on a raised phone, where turning shows up in gamma instead. This follows
+// the top of the screen when flat and the back of the phone as it rises, as a person aims it.
+function headingFromAngles(alpha: number, beta: number, gamma: number, screenAngle: number): number {
+  const [sA, cA] = [Math.sin(toRad(alpha)), Math.cos(toRad(alpha))];
+  const [sB, cB] = [Math.sin(toRad(beta)), Math.cos(toRad(beta))];
+  const [sG, cG] = [Math.sin(toRad(gamma)), Math.cos(toRad(gamma))];
+  const [sS, cS] = [Math.sin(toRad(screenAngle)), Math.cos(toRad(screenAngle))];
+  // Device axes as east, north and up, from the rotation matrix in the W3C spec.
+  const right = [cA * cG - sA * sB * sG, cG * sA + cA * sB * sG, -cB * sG];
+  const top = [-cB * sA, cA * cB, sB];
+  const back = [-cA * sG - sA * sB * cG, -sA * sG + cA * sB * cG];
+  const [east, north, up] = top.map((axis, i) => axis * cS + right[i] * sS);
+  const lean = Math.max(0, up);
+  return normalizeDegrees(toDeg(Math.atan2(east + back[0] * lean, north + back[1] * lean)));
 }

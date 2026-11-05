@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { circularMean, headingFromOrientation } from '../lib/geo';
+import { angleBetween, headingFromOrientation, normalizeDegrees, type OrientationReading } from '../lib/geo';
 
-const SMOOTHING_WINDOW = 5;
+const SMOOTHING_MS = 250;
+const MIN_CHANGE_DEG = 1;
+// iOS reports its error in degrees; past this the arrow can point to the wrong side of a person.
+const WEAK_COMPASS_DEG = 25;
 
 type PermissionableOrientation = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<'granted' | 'denied'>;
@@ -17,17 +20,38 @@ export function useHeading() {
   const [heading, setHeading] = useState<number | null>(null);
   const [granted, setGranted] = useState(() => typeof orientationApi()?.requestPermission !== 'function');
   const [denied, setDenied] = useState(false);
+  const [weak, setWeak] = useState(false);
 
   useEffect(() => {
     if (!orientationApi()) return;
-    const recent: number[] = [];
+    let smoothed: number | null = null;
+    let shown: number | null = null;
+    let lastEvent = 0;
 
     const onOrientation = (event: DeviceOrientationEvent) => {
+      const iosError = (event as OrientationReading).webkitCompassAccuracy;
       const reading = headingFromOrientation(event, screenAngle());
-      if (reading === null) return;
-      recent.push(reading);
-      if (recent.length > SMOOTHING_WINDOW) recent.shift();
-      setHeading(circularMean(recent));
+      if (reading === null) {
+        // Android's relative events also land here, and those say nothing about the compass.
+        if (iosError !== undefined && iosError < 0) {
+          smoothed = shown = null;
+          setHeading(null);
+          setWeak(true);
+        }
+        return;
+      }
+      setWeak(iosError !== undefined && iosError > WEAK_COMPASS_DEG);
+      const now = performance.now();
+      smoothed =
+        smoothed === null
+          ? reading
+          : normalizeDegrees(smoothed + angleBetween(reading, smoothed) * (1 - Math.exp((lastEvent - now) / SMOOTHING_MS)));
+      lastEvent = now;
+      // Sensors fire about 60 times per second; redrawing for noise only spends battery.
+      if (shown === null || Math.abs(angleBetween(smoothed, shown)) >= MIN_CHANGE_DEG) {
+        shown = smoothed;
+        setHeading(smoothed);
+      }
       // iOS keeps the grant for the session, so events can arrive without asking again.
       setGranted(true);
     };
@@ -63,5 +87,5 @@ export function useHeading() {
     }
   }, []);
 
-  return { heading, needsPermission: !granted && !denied, denied, requestPermission };
+  return { heading, weak, needsPermission: !granted && !denied, denied, requestPermission };
 }

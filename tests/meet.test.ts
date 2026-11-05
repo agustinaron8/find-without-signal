@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   accuracyCircle,
   currentTripStart,
+  filterFix,
   hasArrived,
+  haversine,
   headingFromOrientation,
+  magneticDeclination,
   nextPlanTime,
   nextRotation,
   parseCoords,
+  recentWalk,
   shouldRecordTrackPoint,
+  walkTrend,
 } from '../src/lib/geo';
 import { buildLocationMessage, buildSmsUri, normalizePhone } from '../src/lib/sms';
 
@@ -21,10 +26,14 @@ describe('nextRotation', () => {
 });
 
 describe('hasArrived', () => {
-  it('uses the 25 m floor or the GPS accuracy', () => {
-    expect(hasArrived(20, 5)).toBe(true);
-    expect(hasArrived(30, 5)).toBe(false);
+  it('uses the 15 m floor or the GPS accuracy', () => {
+    expect(hasArrived(14, 5)).toBe(true);
+    expect(hasArrived(20, 5)).toBe(false);
     expect(hasArrived(30, 40)).toBe(true);
+  });
+  it('does not flip back to the arrow on GPS jitter', () => {
+    expect(hasArrived(20, 5, true)).toBe(true);
+    expect(hasArrived(25, 5, true)).toBe(false);
   });
   it('never claims arrival on a poor fix', () => {
     expect(hasArrived(10, 80)).toBe(false);
@@ -84,9 +93,94 @@ describe('headingFromOrientation', () => {
   it('inverts absolute Android alpha', () => {
     expect(headingFromOrientation({ alpha: 90, absolute: true }, 0)).toBe(270);
   });
+  it('follows the back of a raised phone, where turning shows up in gamma', () => {
+    expect(headingFromOrientation({ alpha: 0, beta: 90, gamma: 30, absolute: true }, 0)).toBeCloseTo(330);
+    expect(headingFromOrientation({ alpha: 90, beta: 90, gamma: 0, absolute: true }, 0)).toBeCloseTo(270);
+  });
+  it('keeps the top of the phone when tilted in the hand', () => {
+    expect(headingFromOrientation({ alpha: 90, beta: 0, gamma: 0, absolute: true }, 0)).toBeCloseTo(270);
+    expect(headingFromOrientation({ alpha: 10, beta: 0, gamma: 25, absolute: true }, 0)).toBeCloseTo(350);
+    expect(headingFromOrientation({ alpha: 90, beta: 45, gamma: 0, absolute: true }, 0)).toBeCloseTo(270);
+  });
+  it('still points forward when leaning a little past vertical', () => {
+    expect(headingFromOrientation({ alpha: 90, beta: 110, gamma: 0, absolute: true }, 0)).toBeCloseTo(270);
+  });
+  it('accounts for a sideways screen', () => {
+    expect(headingFromOrientation({ alpha: 0, beta: 0, gamma: 0, absolute: true }, 90)).toBeCloseTo(90);
+  });
   it('ignores relative orientation, which is not a compass', () => {
     expect(headingFromOrientation({ alpha: 90, absolute: false }, 0)).toBeNull();
     expect(headingFromOrientation({ alpha: null, absolute: true }, 0)).toBeNull();
+  });
+});
+
+describe('magneticDeclination', () => {
+  it('corrects near the event and stays out of what it does not know', () => {
+    expect(magneticDeclination({ lat: -31.42, lng: -64.19 })).toBeCloseTo(-7.1);
+    expect(magneticDeclination({ lat: -34.6, lng: -58.38 })).toBe(0);
+  });
+});
+
+describe('filterFix', () => {
+  const good = { lat: -31.45, lng: -64.27, accuracy: 8, t: 0 };
+  it('keeps a good position when a coarse fix arrives', () => {
+    const next = filterFix(good, { lat: -31.46, lng: -64.28, accuracy: 900, t: 5000 });
+    expect(haversine(good, next)).toBeLessThan(2);
+    expect(next.accuracy).toBeCloseTo(8 + 3 * 5);
+  });
+  it('never claims better than the phone does', () => {
+    const next = filterFix(good, { ...good, lat: -31.45001, accuracy: 10, t: 1000 });
+    expect(next.accuracy).toBe(10);
+  });
+  it('follows a walk closely', () => {
+    let fix = good;
+    for (let i = 1; i <= 30; i++) fix = filterFix(fix, { ...good, lat: good.lat + i * 1.3 / 111320, accuracy: 8, t: i * 1000 });
+    const real = { lat: good.lat + 30 * 1.3 / 111320, lng: good.lng };
+    expect(haversine(fix, real)).toBeLessThan(3);
+  });
+  it('trusts a new fix after a long gap', () => {
+    const next = filterFix(good, { lat: -31.46, lng: -64.28, accuracy: 10, t: 600000 });
+    expect(next.lat).toBeCloseTo(-31.46, 4);
+  });
+  it('survives a browser that reports zero accuracy', () => {
+    const next = filterFix({ ...good, accuracy: 0 }, { ...good, accuracy: 0 });
+    expect(Number.isFinite(next.lat)).toBe(true);
+  });
+});
+
+describe('recentWalk', () => {
+  const north = (seconds: number, heading: number | null = 0) => ({
+    lat: -31.45 + seconds * 1.3 / 111320,
+    lng: -64.27,
+    accuracy: 8,
+    t: seconds * 1000,
+    heading,
+  });
+  const walking = (heading: number | null) => Array.from({ length: 16 }, (_, i) => north(i, heading));
+
+  it('finds the course of a steady walk', () => {
+    expect(recentWalk(walking(0))?.course).toBeCloseTo(0, 0);
+  });
+  it('measures how far off the compass is', () => {
+    expect(recentWalk(walking(80))?.compassError).toBeCloseTo(-80, 0);
+    expect(recentWalk(walking(null))?.compassError).toBeNull();
+  });
+  it('says nothing while standing, even if the GPS drifts', () => {
+    const drift = Array.from({ length: 16 }, (_, i) => ({ ...north(0), lat: -31.45 + (i % 2) * 20 / 111320, t: i * 1000 }));
+    expect(recentWalk(drift)).toBeNull();
+    expect(recentWalk([north(0), north(1)])).toBeNull();
+    expect(recentWalk([])).toBeNull();
+  });
+  it('does not trust a move smaller than the GPS error', () => {
+    expect(recentWalk(walking(0).map((s) => ({ ...s, accuracy: 30 })))).toBeNull();
+  });
+});
+
+describe('walkTrend', () => {
+  it('compares the walk with the way to the target', () => {
+    expect(walkTrend(10, 350)).toBe('closer');
+    expect(walkTrend(90, 0)).toBe('sideways');
+    expect(walkTrend(180, 0)).toBe('away');
   });
 });
 

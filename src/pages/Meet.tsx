@@ -12,20 +12,25 @@ import { db, type TrackPoint } from '../db';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useHeading } from '../hooks/useHeading';
 import { useLastKnown } from '../hooks/useLastKnown';
+import { useWalk } from '../hooks/useWalk';
 import { useWakeLock } from '../hooks/useWakeLock';
 import {
   bearing,
   cardinalName,
+  combinedAccuracy,
   currentTripStart,
   formatDistance,
   formatWalkTime,
   hasArrived,
   haversine,
   isPoorFix,
+  magneticDeclination,
   nextPlanTime,
   normalizeDegrees,
   parseCoords,
+  SAVE_MAX_ACCURACY_M,
   shouldRecordTrackPoint,
+  walkTrend,
 } from '../lib/geo';
 import { formatAge, LOCATION_STALE_MS, STATUSES } from '../lib/lastKnown';
 import { groupRoster, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
@@ -37,6 +42,14 @@ const MEMBER_PREFIX = 'member-';
 const PERSONAL_COLOR = '#16a34a';
 const GPS_HEADING_MIN_SPEED_MS = 0.5;
 const TRACK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const GPS_STALE_MS = 30000;
+const ROUGH_ARROW_RATIO = 0.5;
+
+const TREND_TEXT = {
+  closer: { text: 'Vas bien: te estás acercando', color: 'text-green-800' },
+  sideways: { text: 'Vas de costado', color: 'text-amber-800' },
+  away: { text: 'Te estás alejando: date vuelta', color: 'text-red-800' },
+};
 
 const buttonBase = 'flex items-center justify-center gap-2 rounded-xl p-2 font-semibold';
 const bigButton = `${buttonBase} bg-slate-200 text-slate-950`;
@@ -52,7 +65,9 @@ export default function Meet() {
   );
 
   const { position, error: geoError } = useGeolocation();
-  const { heading: compassHeading, needsPermission, denied, requestPermission } = useHeading();
+  const { heading: magneticHeading, weak: weakCompass, needsPermission, denied, requestPermission } = useHeading();
+  const compassHeading = magneticHeading !== null && position ? normalizeDegrees(magneticHeading + magneticDeclination(position)) : magneticHeading;
+  const walk = useWalk(position, compassHeading);
   const screenStaysOn = useWakeLock();
   const lastKnown = useLastKnown(group, position);
 
@@ -66,6 +81,7 @@ export default function Meet() {
   const [sheetError, setSheetError] = useState('');
   const [now, setNow] = useState(() => new Date());
   const lastTrackRef = useRef<TrackPoint | undefined>(undefined);
+  const arrivedAt = useRef<string | null>(null);
 
   const chooseDestination = (value: string) => {
     setDestinationId(value);
@@ -73,7 +89,7 @@ export default function Meet() {
   };
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 30000);
+    const timer = window.setInterval(() => setNow(new Date()), 5000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -90,12 +106,12 @@ export default function Meet() {
   const locations = lastKnown.locations;
   const roster = useMemo(() => groupRoster(group?.members ?? [], locations, group?.myMemberId), [group, locations]);
   const destinations = useMemo(() => {
-    const list = (group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: p.description }));
-    (personal ?? []).forEach((p) => list.push({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: undefined }));
-    if (trackStart) list.push({ id: TRACK_START_ID, name: 'Donde arranqué', lat: trackStart.lat, lng: trackStart.lng, description: undefined });
+    const list = (group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: p.description, accuracy: undefined as number | undefined }));
+    (personal ?? []).forEach((p) => list.push({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: undefined, accuracy: p.acc }));
+    if (trackStart) list.push({ id: TRACK_START_ID, name: 'Donde arranqué', lat: trackStart.lat, lng: trackStart.lng, description: undefined, accuracy: trackStart.acc });
     const named = locations.flatMap((l) => {
       const member = roster.find((m) => m.id === l.memberId);
-      return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, description: undefined }] : [];
+      return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, description: undefined, accuracy: l.acc as number | undefined }] : [];
     });
     list.push(...sortMembers(named));
     return list;
@@ -143,11 +159,19 @@ export default function Meet() {
   }
 
   const movingHeading = position?.speed != null && position.speed > GPS_HEADING_MIN_SPEED_MS ? position.heading : null;
-  const heading = compassHeading ?? movingHeading;
+  const heading = walk.correctedCompass ?? walk.course ?? movingHeading;
   const distance = position && destination ? haversine(position, destination) : null;
   const toTarget = position && destination ? bearing(position, destination) : null;
   const poorFix = !!position && isPoorFix(position.accuracy);
-  const arrived = distance !== null && !!position && hasArrived(distance, position.accuracy);
+  const gpsAge = position ? now.getTime() - position.t : 0;
+  const gpsStale = gpsAge > GPS_STALE_MS;
+  // Both ends can be off: where I am now, and where the point was when it was saved.
+  const totalAccuracy = position ? combinedAccuracy(position.accuracy, destination?.accuracy) : 0;
+  const arrived = distance !== null && !gpsStale && hasArrived(distance, totalAccuracy, arrivedAt.current === destination?.id);
+  arrivedAt.current = arrived ? (destination?.id ?? null) : null;
+  const roughArrow = distance !== null && totalAccuracy > distance * ROUGH_ARROW_RATIO;
+  const trend = walk.course !== null && toTarget !== null && !arrived && !gpsStale ? TREND_TEXT[walkTrend(walk.course, toTarget)] : null;
+  const canSaveHere = !!position && !gpsStale && position.accuracy <= SAVE_MAX_ACCURACY_M;
   const plan = group.planTimes?.length ? nextPlanTime(group.planTimes, now) : null;
   const destinationLocation = destination?.id.startsWith(MEMBER_PREFIX)
     ? locations.find((l) => MEMBER_PREFIX + l.memberId === destination.id)
@@ -161,16 +185,16 @@ export default function Meet() {
     setSheet(next);
   };
 
-  const savePersonal = async (name: string, lat: number, lng: number) => {
+  const savePersonal = async (name: string, lat: number, lng: number, acc?: number) => {
     const pointId = crypto.randomUUID();
-    await db.personalPoints.add({ id: pointId, groupId: id, name, lat, lng, createdAt: Date.now() });
+    await db.personalPoints.add({ id: pointId, groupId: id, name, lat, lng, acc, createdAt: Date.now() });
     chooseDestination(pointId);
     setSheet(null);
   };
 
   const saveHere = () => {
     if (!position) return setSheetError('Todavía no tengo tu ubicación.');
-    savePersonal(draftName.trim() || 'Mi lugar', position.lat, position.lng);
+    savePersonal(draftName.trim() || 'Mi lugar', position.lat, position.lng, position.accuracy);
   };
 
   const savePasted = () => {
@@ -232,12 +256,46 @@ export default function Meet() {
               <p className="text-6xl" aria-hidden>
                 📍
               </p>
-              <p className="text-4xl font-black">{destinationLocation ? `Estás donde estaba ${destination?.name}` : '¡Estás en el punto!'}</p>
+              <p className="text-4xl font-black">
+                {totalAccuracy > SAVE_MAX_ACCURACY_M ? 'Estás cerca' : destinationLocation ? `Estás donde estaba ${destination?.name}` : '¡Estás en el punto!'}
+              </p>
+              {totalAccuracy > SAVE_MAX_ACCURACY_M && (
+                <p data-testid="arrival-limit" className="text-lg font-semibold">
+                  El GPS no da más precisión (±{Math.round(totalAccuracy)} m). Seguí con la vista.
+                </p>
+              )}
               <ArrivalBuzz />
             </>
           ) : (
             <>
-              {toTarget !== null && heading !== null && <Compass rotation={normalizeDegrees(toTarget - heading)} />}
+              {toTarget !== null && heading !== null && (
+                <>
+                  <Compass rotation={normalizeDegrees(toTarget - heading)} />
+                  <p data-testid="arrow-hint" className="font-semibold">
+                    Caminá hacia donde apunta la flecha
+                  </p>
+                </>
+              )}
+              {trend && (
+                <p data-testid="walk-trend" className={`text-xl font-black ${trend.color}`}>
+                  {trend.text}
+                </p>
+              )}
+              {roughArrow && toTarget !== null && (
+                <p data-testid="rough-arrow" className="font-semibold text-amber-800">
+                  Flecha aproximada: estás cerca y el error es de ±{Math.round(totalAccuracy)} m
+                </p>
+              )}
+              {weakCompass && (
+                <p data-testid="weak-compass" className="font-semibold text-amber-800">
+                  Brújula imprecisa: mové el teléfono dibujando un 8
+                </p>
+              )}
+              {walk.corrected && (
+                <p data-testid="compass-corrected" className="font-semibold text-amber-800">
+                  La brújula estaba desviada: la corregí con tu dirección al caminar
+                </p>
+              )}
               {toTarget !== null && heading === null && (
                 <p className="text-lg font-semibold">
                   {denied || !needsPermission ? 'Caminá unos pasos para orientar la flecha' : 'Activá la brújula para ver la flecha'}
@@ -265,6 +323,11 @@ export default function Meet() {
           )}
           {distance !== null && !arrived && <p className="text-xl font-semibold">{formatWalkTime(distance)} caminando</p>}
           {destination?.description && <p className="text-lg">{destination.description}</p>}
+          {!destinationLocation && destination?.accuracy !== undefined && destination.accuracy > SAVE_MAX_ACCURACY_M && (
+            <p data-testid="saved-accuracy" className="font-semibold text-amber-800">
+              Este punto se guardó con un error de ±{Math.round(destination.accuracy)} m
+            </p>
+          )}
           {destinationLocation && (
             <p data-testid="location-age" className={`text-lg font-bold ${locationAge > LOCATION_STALE_MS ? 'text-red-800' : ''}`}>
               {destinationLocation.status && STATUSES[destinationLocation.status] ? `"${STATUSES[destinationLocation.status]}". ` : ''}
@@ -272,6 +335,11 @@ export default function Meet() {
             </p>
           )}
 
+          {gpsStale && (
+            <p data-testid="gps-stale" role="alert" className="rounded-lg bg-red-100 p-3 font-semibold text-red-900">
+              El GPS no se actualiza ({gpsAge < 60000 ? 'menos de 1 min' : formatAge(gpsAge)}). La flecha y la distancia pueden estar mal.
+            </p>
+          )}
           {position && !poorFix && (
             <p data-testid="accuracy" className="text-slate-700">
               Precisión ±{Math.round(position.accuracy)} m
@@ -384,13 +452,22 @@ export default function Meet() {
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
             />
+            {sheet === 'save' && (
+              <p data-testid="save-accuracy" className={`rounded-lg p-3 font-semibold ${canSaveHere ? 'bg-green-100 text-green-900' : 'bg-amber-100 text-amber-900'}`}>
+                {!position
+                  ? 'Buscando GPS…'
+                  : canSaveHere
+                    ? `Precisión ±${Math.round(position.accuracy)} m: buen momento para guardar.`
+                    : `GPS con ±${Math.round(position.accuracy)} m. Si podés, esperá a que baje de ${SAVE_MAX_ACCURACY_M} m: si no, el punto queda corrido.`}
+              </p>
+            )}
             {sheetError && (
               <p role="alert" className="rounded-lg bg-red-100 p-3 font-semibold text-red-900">
                 {sheetError}
               </p>
             )}
             <button type="button" className={`${primaryButton} w-full`} onClick={sheet === 'save' ? saveHere : savePasted}>
-              {sheet === 'save' ? 'Guardar' : 'Ir a esa ubicación'}
+              {sheet === 'paste' ? 'Ir a esa ubicación' : canSaveHere || !position ? 'Guardar' : 'Guardar igual'}
             </button>
             <button type="button" className={`${bigButton} w-full`} onClick={() => setSheet(null)}>
               Cancelar

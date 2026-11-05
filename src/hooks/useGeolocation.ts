@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { filterFix, type Fix } from '../lib/geo';
 
 export interface Position {
   lat: number;
@@ -21,21 +22,20 @@ export function useGeolocation() {
       return;
     }
     let watchId: number | null = null;
+    let filtered: Fix | null = null;
 
     const start = () => {
       if (watchId !== null) return;
       watchId = navigator.geolocation.watchPosition(
         ({ coords }) => {
           setError(null);
-          setPosition({
-            lat: coords.latitude,
-            lng: coords.longitude,
-            accuracy: coords.accuracy,
-            heading: coords.heading,
-            speed: coords.speed,
-            // Not the fix's own timestamp: WebKit was seen reporting it in microseconds.
-            t: Date.now(),
-          });
+          // Some browsers report NaN instead of null while standing still.
+          const speed = Number.isFinite(coords.speed) ? coords.speed : null;
+          const heading = Number.isFinite(coords.heading) ? coords.heading : null;
+          // Not the fix's own timestamp: WebKit was seen reporting it in microseconds.
+          const fix = { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy, t: Date.now() };
+          filtered = filterFix(filtered, fix, speed);
+          setPosition({ ...filtered, heading, speed });
         },
         (err) => {
           // Timeouts are normal without A-GPS; the watch keeps trying on its own.

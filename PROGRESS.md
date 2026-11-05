@@ -49,7 +49,7 @@ Mejoras de preparación: invitación con pasos, aviso en Safari, mapa automátic
 - [ ] Compartir por QR de iPhone a Android y viceversa, los dos sin red.
 - [ ] SMS: enviar desde A, pegar en B y navegar hacia ese punto.
 - [ ] La pantalla no se apaga en el Modo Encuentro.
-- [ ] Brújula: comparar contra la brújula nativa del teléfono (±15°).
+- [ ] Brújula: guardar un punto, alejarse 100 m a pie y confirmar que la flecha apunta al punto, con el teléfono plano y levantado. Comparada con una brújula nativa magnética da unos 7° de diferencia, a propósito.
 - [ ] Instalar ya, cerrar todo, y el domingo abrir en modo avión: grupo, mapa y flecha siguen ahí.
 - [ ] Última ubicación: activarla en dos teléfonos y confirmar que cada uno ve al otro.
 - [ ] Antes del evento: abrir el grupo y confirmar que el checklist "Listo para usar sin señal" está completo, en cada teléfono.

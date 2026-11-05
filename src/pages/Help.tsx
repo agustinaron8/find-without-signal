@@ -75,7 +75,7 @@ export default function Help() {
             </li>
             <li>En iPhone, usá siempre la app instalada y no borres los datos de Safari ni la app antes de que termine el evento.</li>
             <li>Sin señal, el GPS puede tardar hasta un minuto en ubicarte la primera vez.</li>
-            <li>La brújula se confunde cerca de metal e imanes. Alejá el teléfono de otros aparatos y confirmá con la distancia: si baja, vas bien.</li>
+            <li>La brújula se confunde cerca de metal e imanes. Alejá el teléfono de otros aparatos. Al caminar, la app te dice si te acercás o te alejás, sin usar la brújula: si no coinciden, hacele caso a eso.</li>
           </ul>
         </section>
 

@@ -55,6 +55,7 @@ export interface PersonalPoint {
   name: string;
   lat: number;
   lng: number;
+  acc?: number;
   createdAt: number;
 }
 
