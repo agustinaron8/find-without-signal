@@ -8,3 +8,7 @@
 - El descargador reutiliza la versión de tiles ya guardada mientras siga disponible; si cambia, las zonas de otros grupos se marcan para volver a bajar.
 - Si los puntos están muy lejos, además de reducir el margen se baja el zoom máximo (hasta z12); si igual no entra, se avisa y no se descarga.
 - Se bajan también los tiles raster de baja resolución y el rango de glifos 8192-8447, que usan el estilo y los nombres de lugares.
+- SMS en texto GSM-7 ("Estoy aca", "+-") y coordenadas con 5 decimales, para que entre en un solo segmento y sea preciso entre mucha gente.
+- Con GPS impreciso (>50 m) se muestra "≈ distancia" junto con "Buscando GPS…" en vez de ocultar el dato; nunca se anuncia llegada con esa precisión.
+- "Volver por donde vine" usa el primer punto de las últimas 12 h, para no mandarte a donde probaste la app en casa.
+- Modo Encuentro en fondo blanco y texto negro: es lo que mejor se lee al sol.

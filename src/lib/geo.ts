@@ -84,3 +84,65 @@ export function parseCoords(input: string): LatLng | null {
   }
   return null;
 }
+
+export const isPoorFix = (accuracy: number) => accuracy > 50;
+
+// Accumulates rotation so a move from 359° to 1° turns 2° instead of spinning back around.
+export function nextRotation(previous: number, target: number): number {
+  const delta = ((target - previous) % 360 + 540) % 360 - 180;
+  return previous + delta;
+}
+
+export function hasArrived(distance: number, accuracy: number): boolean {
+  return !isPoorFix(accuracy) && distance <= Math.max(accuracy, 25);
+}
+
+const TRACK_MIN_INTERVAL_MS = 15000;
+const TRACK_MIN_DISTANCE_M = 10;
+const TRACK_MAX_ACCURACY_M = 40;
+
+export function shouldRecordTrackPoint(
+  last: (LatLng & { t: number }) | undefined,
+  next: LatLng & { t: number; acc: number },
+): boolean {
+  if (next.acc >= TRACK_MAX_ACCURACY_M) return false;
+  if (!last) return true;
+  return next.t - last.t >= TRACK_MIN_INTERVAL_MS && haversine(last, next) >= TRACK_MIN_DISTANCE_M;
+}
+
+export function nextPlanTime(times: string[], now: Date): { time: string; minutes: number } | null {
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const upcoming = times
+    .map((time) => {
+      const [h, m] = time.split(':').map(Number);
+      const of = h * 60 + m;
+      return { time, minutes: of > nowMinutes ? of - nowMinutes : of + 1440 - nowMinutes };
+    })
+    .sort((a, b) => a.minutes - b.minutes);
+  return upcoming[0] ?? null;
+}
+
+export function accuracyCircle(center: LatLng, radiusM: number, steps = 32): [number, number][] {
+  const latDelta = radiusM / 111320;
+  const lngDelta = radiusM / (111320 * Math.max(0.01, Math.cos(toRad(center.lat))));
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const angle = (i / steps) * 2 * Math.PI;
+    return [center.lng + lngDelta * Math.cos(angle), center.lat + latDelta * Math.sin(angle)];
+  });
+}
+
+interface OrientationReading {
+  alpha: number | null;
+  absolute?: boolean;
+  webkitCompassHeading?: number;
+  webkitCompassAccuracy?: number;
+}
+
+export function headingFromOrientation(event: OrientationReading, screenAngle: number): number | null {
+  if (typeof event.webkitCompassHeading === 'number') {
+    if ((event.webkitCompassAccuracy ?? 0) < 0) return null;
+    return normalizeDegrees(event.webkitCompassHeading + screenAngle);
+  }
+  if (event.absolute && typeof event.alpha === 'number') return normalizeDegrees(360 - event.alpha + screenAngle);
+  return null;
+}

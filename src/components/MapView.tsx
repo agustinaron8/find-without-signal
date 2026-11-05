@@ -1,7 +1,8 @@
-import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
+import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
 import { MAP_STYLE_URL } from '../config';
+import { accuracyCircle, type LatLng } from '../lib/geo';
 
 export interface MapPoint {
   id: string;
@@ -11,8 +12,15 @@ export interface MapPoint {
   color?: string;
 }
 
+export interface MapOverlay {
+  position?: LatLng & { accuracy: number };
+  track?: LatLng[];
+  destination?: LatLng;
+}
+
 interface MapViewProps {
   points: MapPoint[];
+  overlay?: MapOverlay;
   draggable?: boolean;
   onTap?: (lat: number, lng: number) => void;
   onDragPoint?: (id: string, lat: number, lng: number) => void;
@@ -23,6 +31,60 @@ const DEFAULT_CENTER: [number, number] = [-64.18, -34.6];
 const DEFAULT_ZOOM = 3;
 const SINGLE_POINT_ZOOM = 15;
 const DEFAULT_COLOR = '#38bdf8';
+
+const line = (coordinates: number[][]) => ({
+  type: 'Feature' as const,
+  properties: {},
+  geometry: { type: 'LineString' as const, coordinates },
+});
+
+function applyOverlay(map: MapLibreMap, overlay: MapOverlay) {
+  const { position, track = [], destination } = overlay;
+  const features: Record<string, GeoJSON.Feature | GeoJSON.FeatureCollection> = {
+    'me-accuracy': {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: position ? [accuracyCircle(position, position.accuracy)] : [],
+      },
+    },
+    'me-track': line(track.map((p) => [p.lng, p.lat])),
+    'me-destination': line(
+      position && destination
+        ? [
+            [position.lng, position.lat],
+            [destination.lng, destination.lat],
+          ]
+        : [],
+    ),
+    'me-position': {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Point', coordinates: position ? [position.lng, position.lat] : [] },
+    },
+  };
+
+  if (!map.getSource('me-position')) {
+    Object.entries(features).forEach(([id, data]) => map.addSource(id, { type: 'geojson', data }));
+    map.addLayer({ id: 'me-accuracy', type: 'fill', source: 'me-accuracy', paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.15 } });
+    map.addLayer({ id: 'me-track', type: 'line', source: 'me-track', paint: { 'line-color': '#7c3aed', 'line-width': 4 } });
+    map.addLayer({
+      id: 'me-destination',
+      type: 'line',
+      source: 'me-destination',
+      paint: { 'line-color': '#dc2626', 'line-width': 3, 'line-dasharray': [2, 2] },
+    });
+    map.addLayer({
+      id: 'me-position',
+      type: 'circle',
+      source: 'me-position',
+      paint: { 'circle-radius': 9, 'circle-color': '#2563eb', 'circle-stroke-width': 3, 'circle-stroke-color': '#ffffff' },
+    });
+    return;
+  }
+  Object.entries(features).forEach(([id, data]) => (map.getSource(id) as GeoJSONSource).setData(data));
+}
 
 function createMarkerElement(name: string, color: string): HTMLElement {
   const root = document.createElement('div');
@@ -38,12 +100,15 @@ function createMarkerElement(name: string, color: string): HTMLElement {
   return root;
 }
 
-export default function MapView({ points, draggable, onTap, onDragPoint, className }: MapViewProps) {
+export default function MapView({ points, overlay, draggable, onTap, onDragPoint, className }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef(new Map<string, Marker>());
   const callbacksRef = useRef({ onTap, onDragPoint });
   const initialPointsRef = useRef(points);
+  const overlayRef = useRef(overlay);
+  const loadedRef = useRef(false);
+  const framedRef = useRef(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -77,7 +142,11 @@ export default function MapView({ points, draggable, onTap, onDragPoint, classNa
     map.on('style.load', () => {
       styleLoaded = true;
     });
-    map.on('load', () => setFailed(false));
+    map.on('load', () => {
+      loadedRef.current = true;
+      setFailed(false);
+      if (overlayRef.current) applyOverlay(map, overlayRef.current);
+    });
     map.on('error', (e: { sourceId?: string; tile?: unknown }) => {
       // A missing tile only leaves a blank patch; a missing style or tileset means no map at all.
       if (!styleLoaded || (e.sourceId && !e.tile)) setFailed(true);
@@ -87,6 +156,7 @@ export default function MapView({ points, draggable, onTap, onDragPoint, classNa
       map.remove();
       markers.clear();
       mapRef.current = null;
+      loadedRef.current = false;
     };
   }, []);
 
@@ -128,9 +198,25 @@ export default function MapView({ points, draggable, onTap, onDragPoint, classNa
     });
   }, [points, draggable]);
 
+  useEffect(() => {
+    overlayRef.current = overlay;
+    const map = mapRef.current;
+    if (!map || !overlay) return;
+    if (loadedRef.current) applyOverlay(map, overlay);
+    // Frame "me and my destination" once; after that the map belongs to the user.
+    if (overlay.position && !framedRef.current) {
+      framedRef.current = true;
+      const bounds = new maplibregl.LngLatBounds();
+      bounds.extend([overlay.position.lng, overlay.position.lat]);
+      if (overlay.destination) bounds.extend([overlay.destination.lng, overlay.destination.lat]);
+      map.fitBounds(bounds, { padding: 70, duration: 0, maxZoom: SINGLE_POINT_ZOOM });
+    }
+  }, [overlay]);
+
   return (
     <div className={`relative overflow-hidden rounded-xl bg-slate-900 ${className ?? ''}`}>
-      <div ref={containerRef} className="h-full w-full" />
+      {/* Inline because MapLibre's stylesheet forces `position: relative` over any class. */}
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
       {failed && (
         <p className="absolute inset-x-3 top-3 rounded-lg bg-slate-950/90 p-3 text-sm text-amber-200">
           No se pudo cargar el mapa. Sin señal solo se ve si descargaste la zona antes.
