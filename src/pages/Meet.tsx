@@ -27,7 +27,7 @@ import {
   parseCoords,
   shouldRecordTrackPoint,
 } from '../lib/geo';
-import { formatAge, LOCATION_STALE_MS } from '../lib/lastKnown';
+import { formatAge, LOCATION_STALE_MS, STATUSES } from '../lib/lastKnown';
 import { groupRoster, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 const MapView = lazy(() => import('../components/MapView'));
@@ -267,6 +267,7 @@ export default function Meet() {
           {destination?.description && <p className="text-lg">{destination.description}</p>}
           {destinationLocation && (
             <p data-testid="location-age" className={`text-lg font-bold ${locationAge > LOCATION_STALE_MS ? 'text-red-800' : ''}`}>
+              {destinationLocation.status && STATUSES[destinationLocation.status] ? `"${STATUSES[destinationLocation.status]}". ` : ''}
               Estaba ahí {formatAge(locationAge)}, puede haberse movido
             </p>
           )}
@@ -342,6 +343,8 @@ export default function Meet() {
           locations={locations}
           position={position}
           sharing={lastKnown.sharing}
+          status={lastKnown.status}
+          onStatusChange={lastKnown.setStatus}
           onSharingChange={lastKnown.setSharing}
           lastSync={lastKnown.lastSync}
           failing={lastKnown.failing}

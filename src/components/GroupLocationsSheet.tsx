@@ -4,7 +4,7 @@ import { type Group, type Member, type MemberLocation } from '../db';
 import type { Position } from '../hooks/useGeolocation';
 import IdentityForm from './IdentityForm';
 import { formatDistance, haversine } from '../lib/geo';
-import { formatAge, LOCATION_STALE_MS } from '../lib/lastKnown';
+import { formatAge, LOCATION_STALE_MS, STATUSES } from '../lib/lastKnown';
 import { filterMembers, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 interface Props {
@@ -13,6 +13,8 @@ interface Props {
   locations: MemberLocation[];
   position: Position | null;
   sharing: boolean;
+  status: string | null;
+  onStatusChange: (value: string | null) => void;
   onSharingChange: (value: boolean) => void;
   lastSync: number | null;
   failing: boolean;
@@ -31,6 +33,8 @@ export default function GroupLocationsSheet({
   locations,
   position,
   sharing,
+  status,
+  onStatusChange,
   onSharingChange,
   lastSync,
   failing,
@@ -47,7 +51,7 @@ export default function GroupLocationsSheet({
   const lastSeen = new Map(locations.map((l) => [l.memberId, l.t]));
   // Whoever has a location comes first, newest on top: that is who can actually be found.
   const visible = sortMembers(filterMembers(others, filter)).sort((a, b) => (lastSeen.get(b.id) ?? 0) - (lastSeen.get(a.id) ?? 0));
-  const status = syncing
+  const syncStatus = syncing
     ? 'Buscando red…'
     : failing
       ? `Sin conexión${lastSync ? `. Último contacto: ${formatAge(now - lastSync)}` : ''}. Sigo intentando.`
@@ -78,6 +82,25 @@ export default function GroupLocationsSheet({
             <p className="font-bold">¿Quién sos en este grupo?</p>
             <p className="text-sm text-slate-700">Decilo para poder compartir tu ubicación.</p>
             <IdentityForm group={group} />
+          </div>
+        )}
+
+        {group.myMemberId && sharing && (
+          <div>
+            <p className="mb-1 font-bold">Avisales cómo estás</p>
+            <div className="grid grid-cols-3 gap-2">
+              {Object.entries(STATUSES).map(([code, label]) => (
+                <button
+                  key={code}
+                  type="button"
+                  aria-pressed={status === code}
+                  className={`rounded-xl p-2 text-sm font-semibold ${status === code ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-950'}`}
+                  onClick={() => onStatusChange(status === code ? null : code)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -118,6 +141,7 @@ export default function GroupLocationsSheet({
                 <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: member.color }} />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold">{member.name}</p>
+                  {location?.status && STATUSES[location.status] && <p className="text-sm font-bold">{STATUSES[location.status]}</p>}
                   {location ? (
                     <p className={`text-sm ${stale ? 'font-semibold text-red-800' : 'text-slate-700'}`}>
                       {position && `${formatDistance(haversine(position, location))} · `}
@@ -139,7 +163,7 @@ export default function GroupLocationsSheet({
         {others.length === 0 && <p className="text-slate-700">Todavía nadie compartió su ubicación en este grupo.</p>}
 
         <p role="status" className="min-h-5 text-sm text-slate-700">
-          {status}
+          {syncStatus}
         </p>
         <button type="button" disabled={syncing} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-200 p-3 font-semibold disabled:opacity-50" onClick={onSyncNow}>
           <RefreshCw size={20} /> Actualizar ahora

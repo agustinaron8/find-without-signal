@@ -31,6 +31,13 @@ export const OFF_PENDING = 'off';
 // Who this phone last published as, so that entry can be removed even if the identity changes later.
 export const sharedAsKey = (groupId: string) => `shared-as-${groupId}`;
 
+export const STATUSES: Record<string, string> = {
+  ok: 'Estoy bien',
+  going: 'Voy al punto',
+  staying: 'Me quedo acá',
+};
+export const statusKey = (groupId: string) => `my-status-${groupId}`;
+
 export interface LocationKeys {
   channel: string;
   key: CryptoKey;
@@ -58,6 +65,7 @@ export interface LocationFix {
   name?: string;
   color?: string;
   phone?: string;
+  status?: string;
 }
 
 export async function encryptLocation(key: CryptoKey, fix: LocationFix): Promise<string> {
@@ -73,6 +81,7 @@ export async function encryptLocation(key: CryptoKey, fix: LocationFix): Promise
       n: fix.name?.slice(0, MAX_MEMBER_NAME),
       k: fix.color,
       p: fix.phone && PHONE.test(fix.phone) ? fix.phone : undefined,
+      s: fix.status,
     }),
   );
   const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
@@ -102,6 +111,7 @@ export async function decryptLocation(key: CryptoKey, data: string, now = Date.n
       ...(typeof raw.n === 'string' && raw.n.trim() ? { name: raw.n.trim().slice(0, MAX_MEMBER_NAME) } : {}),
       ...(typeof raw.k === 'string' && HEX_COLOR.test(raw.k) ? { color: raw.k } : {}),
       ...(typeof raw.p === 'string' && PHONE.test(raw.p) ? { phone: raw.p } : {}),
+      ...(typeof raw.s === 'string' && Object.prototype.hasOwnProperty.call(STATUSES, raw.s) ? { status: raw.s } : {}),
     };
   } catch {
     return null;
@@ -146,11 +156,14 @@ export function newestLocations(
   stored: MemberLocation[],
   me?: string,
 ): MemberLocation[] {
-  const newest = new Map(stored.map((s) => [s.memberId, s.t]));
+  const newest = new Map<string, { t: number; status?: string }>(stored.map((s) => [s.memberId, s]));
   const updates = new Map<string, MemberLocation>();
   for (const fix of fixes) {
-    if (fix.memberId === me || fix.t <= (newest.get(fix.memberId) ?? 0)) continue;
-    newest.set(fix.memberId, fix.t);
+    const known = newest.get(fix.memberId);
+    // A still phone keeps the same fix, and its status can change anyway.
+    const stale = known && (fix.t < known.t || (fix.t === known.t && fix.status === known.status));
+    if (fix.memberId === me || stale) continue;
+    newest.set(fix.memberId, fix);
     updates.set(fix.memberId, { groupId, ...fix });
   }
   return [...updates.values()];

@@ -119,6 +119,9 @@ export default function GroupDetail() {
               <QrCode size={20} /> Mostrar QR
             </button>
           </div>
+          <Link to={`/group/${group.id}/poster`} className="block rounded-xl bg-slate-800 p-3 text-center font-semibold">
+            Cartel para imprimir
+          </Link>
           {shareStatus && (
             <p role="status" className="text-center text-sm text-slate-300">
               {shareStatus}

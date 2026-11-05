@@ -68,6 +68,7 @@ export interface MemberLocation {
   name?: string;
   color?: string;
   phone?: string;
+  status?: string;
 }
 
 class ReencuentroDB extends Dexie {

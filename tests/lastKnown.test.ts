@@ -50,6 +50,13 @@ describe('location crypto', () => {
     expect(bad?.phone).toBeUndefined();
   });
 
+  it('carries a known status and drops anything else', async () => {
+    const { key } = await deriveLocationKeys(GROUP);
+    expect((await decryptLocation(key, await encryptLocation(key, { ...fix, status: 'going' }), NOW))?.status).toBe('going');
+    expect((await decryptLocation(key, await encryptLocation(key, { ...fix, status: 'hack' }), NOW))?.status).toBeUndefined();
+    expect((await decryptLocation(key, await encryptLocation(key, { ...fix, status: 'constructor' }), NOW))?.status).toBeUndefined();
+  });
+
   it('fits a long identity within what the server accepts', async () => {
     const { key } = await deriveLocationKeys(GROUP);
     const data = await encryptLocation(key, { memberId: GROUP, lat: -31.123456789, lng: -64.123456789, acc: 9999, t: fix.t, name: '漢'.repeat(200), color: '#38bdf8', phone: `+54 ${'9'.repeat(200)}` });
@@ -76,6 +83,13 @@ describe('newestLocations', () => {
   it('never moves a location backwards in time', () => {
     expect(newestLocations('g', [{ ...fix, t: 50 }, { ...fix, t: 100 }], [stored])).toEqual([]);
     expect(newestLocations('g', [{ ...fix, t: 150 }], [stored])[0].t).toBe(150);
+  });
+
+  it('lets the status change on the same fix, but never go back with an older one', () => {
+    const withStatus = { ...stored, status: 'going' };
+    expect(newestLocations('g', [{ ...fix, t: 100, status: 'staying' }], [withStatus])[0].status).toBe('staying');
+    expect(newestLocations('g', [{ ...fix, t: 50, status: 'staying' }], [withStatus])).toEqual([]);
+    expect(newestLocations('g', [{ ...fix, t: 100, status: 'going' }], [withStatus])).toEqual([]);
   });
 
   it('keeps only the newest of duplicates, accepts people who joined by link, and ignores myself', () => {

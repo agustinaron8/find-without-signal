@@ -14,6 +14,7 @@ import {
   sendWithoutWaiting,
   sharedAsKey,
   sharingKey,
+  statusKey,
   type SyncWrite,
 } from '../lib/lastKnown';
 import type { Position } from './useGeolocation';
@@ -30,6 +31,7 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     [groupId],
   );
   const [sharing, setSharingState] = useState(false);
+  const [status, setStatusState] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [failing, setFailing] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -40,7 +42,9 @@ export function useLastKnown(group: Group | null | undefined, position: Position
   const prepared = useRef<{ channel: string; write: SyncWrite; at: number; me: string } | null>(null);
 
   useEffect(() => {
-    if (groupId) setSharingState(localStorage.getItem(sharingKey(groupId)) === '1');
+    if (!groupId) return;
+    setSharingState(localStorage.getItem(sharingKey(groupId)) === '1');
+    setStatusState(localStorage.getItem(statusKey(groupId)));
   }, [groupId]);
 
   useEffect(() => {
@@ -55,7 +59,7 @@ export function useLastKnown(group: Group | null | undefined, position: Position
       const { group: current, position: fix, sharing: isSharing } = latest.current;
       const me = current?.members.find((m) => m.id === current.myMemberId);
       if (!me || !isSharing || !fix || fix.accuracy > MAX_SHARED_ACCURACY_M) return undefined;
-      const d = await encryptLocation(key, { memberId: me.id, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t, name: me.name, color: me.color, phone: me.phone });
+      const d = await encryptLocation(key, { memberId: me.id, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t, name: me.name, color: me.color, phone: me.phone, status: localStorage.getItem(statusKey(groupId)) ?? undefined });
       return { m: await memberTag(channel, me.id), d };
     };
 
@@ -167,10 +171,10 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     const at = Date.now();
     (async () => {
       const { channel, key } = await deriveLocationKeys(groupId);
-      const d = await encryptLocation(key, { memberId: me.id, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t, name: me.name, color: me.color, phone: me.phone });
+      const d = await encryptLocation(key, { memberId: me.id, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t, name: me.name, color: me.color, phone: me.phone, status: localStorage.getItem(statusKey(groupId)) ?? undefined });
       prepared.current = { channel, write: { m: await memberTag(channel, me.id), d }, at, me: me.id };
     })().catch(() => undefined);
-  }, [position, sharing, canShareFix, groupId, myMemberId]);
+  }, [position, sharing, canShareFix, groupId, myMemberId, status]);
 
   const setSharing = useCallback(
     (value: boolean) => {
@@ -178,6 +182,18 @@ export function useLastKnown(group: Group | null | undefined, position: Position
       localStorage.setItem(sharingKey(groupId), value ? '1' : OFF_PENDING);
       setSharingState(value);
       // Runs on the next tick so the exchange sees the new value.
+      window.setTimeout(() => runRef.current(), 0);
+    },
+    [groupId],
+  );
+
+  const setStatus = useCallback(
+    (value: string | null) => {
+      if (!groupId) return;
+      if (value) localStorage.setItem(statusKey(groupId), value);
+      else localStorage.removeItem(statusKey(groupId));
+      prepared.current = null;
+      setStatusState(value);
       window.setTimeout(() => runRef.current(), 0);
     },
     [groupId],
@@ -195,5 +211,5 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     [stored, myMemberId, members],
   );
 
-  return { locations, sharing, setSharing, lastSync, failing, syncing, syncNow };
+  return { locations, sharing, setSharing, status, setStatus, lastSync, failing, syncing, syncNow };
 }

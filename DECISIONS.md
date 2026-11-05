@@ -24,5 +24,7 @@
 - Unirse por link: cada persona escribe su nombre y queda marcada como `joined`, fuera de la lista que comparte su teléfono. Los demás la conocen por el nombre que viaja cifrado con su ubicación. Con esto el link queda chico y el QR entra aunque sean 100 personas.
 - Al compartir se manda una invitación con los pasos, no solo el link, y el importador acepta el mensaje entero. En Safari de iPhone, el importador muestra primero cómo instalar.
 - Al unirse, el mapa empieza a bajarse solo (salvo en Safari de iPhone). Compartir la ubicación se ofrece al unirse, pero sigue apagado por defecto.
+- Estados rápidos cerrados ("Estoy bien", "Voy al punto", "Me quedo acá"), sin texto libre: viajan cifrados con la ubicación y ocupan casi nada. No hay "Necesito ayuda": sin red confiable, daría una falsa sensación de que alguien lo va a recibir.
+- Cartel imprimible con QR, puntos, plan y pasos, como respaldo en papel.
 - `/api/loc` no tiene rate limit: un abuso solo agotaría la cuota de la base, y eso apaga esta función sin afectar puntos, flecha ni mapa.
 - La hora de cada posición es la del teléfono al recibirla, no `position.timestamp`: WebKit la informó en microsegundos, y eso rompía la antigüedad y el recorrido.
