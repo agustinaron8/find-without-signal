@@ -234,6 +234,12 @@ export interface OrientationReading {
   webkitCompassAccuracy?: number;
 }
 
+// The compass follows the top of the phone, and the page only turns with it when it is really
+// sideways. A page drawn upright needs no turn, whatever angle the browser reports.
+export function effectiveScreenAngle(reported: number, width: number, height: number): number {
+  return width <= height && Math.abs(reported) % 180 === 90 ? 0 : reported;
+}
+
 export function headingFromOrientation(event: OrientationReading, screenAngle: number): number | null {
   if (typeof event.webkitCompassHeading === 'number') {
     if ((event.webkitCompassAccuracy ?? 0) < 0) return null;

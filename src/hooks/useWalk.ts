@@ -30,5 +30,6 @@ export function useWalk(position: Position | null, compassHeading: number | null
     course: walk?.course ?? null,
     correctedCompass: compassHeading === null ? null : normalizeDegrees(compassHeading + offset),
     corrected: compassHeading !== null && offset !== 0,
+    offset,
   };
 }

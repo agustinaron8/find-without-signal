@@ -33,4 +33,5 @@
 - Llegada: el piso bajó de 25 a 15 m, porque entre mucha gente 25 m no alcanzan para verse y hacía desaparecer la flecha. Con un error mayor a 25 m se dice "Estás cerca", no "Estás en el punto". El error del punto guardado también cuenta.
 - "Guardar este lugar" muestra la precisión y pide esperar si supera 25 m, pero deja guardar igual: puede no haber tiempo para esperar.
 - "Reiniciar recorrido" borra la línea violeta y también "Donde arranqué", que sale de esa misma línea; por eso pide confirmación y lo avisa.
+- Con la página en vertical se ignora un ángulo de pantalla de ±90°: si la página no giró, la brújula ya está referida a la parte de arriba del teléfono. Tocar la distancia abre los datos crudos de los sensores, para diagnosticar la flecha en un teléfono real.
 - La hora de cada posición es la del teléfono al recibirla, no `position.timestamp`: WebKit la informó en microsegundos, y eso rompía la antigüedad y el recorrido.

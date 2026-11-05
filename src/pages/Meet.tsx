@@ -3,6 +3,7 @@ import { ArrowLeft, Bookmark, ClipboardPaste, Compass as CompassIcon, Flashlight
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Compass from '../components/Compass';
+import CompassDebug from '../components/CompassDebug';
 import GroupLocationsSheet from '../components/GroupLocationsSheet';
 import type { MapPoint } from '../components/MapView';
 import PocketScreen from '../components/PocketScreen';
@@ -65,7 +66,7 @@ export default function Meet() {
   );
 
   const { position, error: geoError } = useGeolocation();
-  const { heading: magneticHeading, weak: weakCompass, needsPermission, denied, requestPermission } = useHeading();
+  const { heading: magneticHeading, weak: weakCompass, debug: headingDebug, needsPermission, denied, requestPermission } = useHeading();
   const compassHeading = magneticHeading !== null && position ? normalizeDegrees(magneticHeading + magneticDeclination(position)) : magneticHeading;
   const walk = useWalk(position, compassHeading);
   const screenStaysOn = useWakeLock();
@@ -80,6 +81,7 @@ export default function Meet() {
   const [pasted, setPasted] = useState('');
   const [sheetError, setSheetError] = useState('');
   const [now, setNow] = useState(() => new Date());
+  const [showDebug, setShowDebug] = useState(false);
   const lastTrackRef = useRef<TrackPoint | undefined>(undefined);
   const arrivedAt = useRef<string | null>(null);
 
@@ -160,6 +162,7 @@ export default function Meet() {
 
   const movingHeading = position?.speed != null && position.speed > GPS_HEADING_MIN_SPEED_MS ? position.heading : null;
   const heading = walk.correctedCompass ?? walk.course ?? movingHeading;
+  const headingSource = walk.correctedCompass !== null ? 'brújula' : walk.course !== null ? 'marcha' : movingHeading !== null ? 'GPS' : 'ninguna';
   const distance = position && destination ? haversine(position, destination) : null;
   const toTarget = position && destination ? bearing(position, destination) : null;
   const poorFix = !!position && isPoorFix(position.accuracy);
@@ -287,6 +290,11 @@ export default function Meet() {
                   </p>
                 </>
               )}
+              {heading !== null && headingSource !== 'brújula' && (
+                <p data-testid="no-compass" className="font-semibold text-amber-800">
+                  {denied ? 'Sin permiso de brújula' : 'Sin brújula'}: la flecha solo vale mientras caminás, y según tu dirección de marcha
+                </p>
+              )}
               {trend && (
                 <p data-testid="walk-trend" className={`text-xl font-black ${trend.color}`}>
                   {trend.text}
@@ -327,10 +335,25 @@ export default function Meet() {
           )}
 
           {distance !== null && (
-            <p data-testid="distance" className="text-6xl font-black tracking-tight">
-              {poorFix && '≈ '}
-              {formatDistance(distance)}
-            </p>
+            // Tapping it opens the raw sensor values, to diagnose a wrong arrow on a real phone.
+            <button type="button" onClick={() => setShowDebug(!showDebug)}>
+              <p data-testid="distance" className="text-6xl font-black tracking-tight">
+                {poorFix && '≈ '}
+                {formatDistance(distance)}
+              </p>
+            </button>
+          )}
+          {showDebug && (
+            <CompassDebug
+              raw={headingDebug.current}
+              source={headingSource}
+              magnetic={magneticHeading}
+              offset={walk.offset}
+              heading={heading}
+              toTarget={toTarget}
+              position={position}
+              destination={destination}
+            />
           )}
           {distance !== null && !arrived && <p className="text-xl font-semibold">{formatWalkTime(distance)} caminando</p>}
           {destination?.description && <p className="text-lg">{destination.description}</p>}

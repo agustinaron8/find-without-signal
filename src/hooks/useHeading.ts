@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { angleBetween, headingFromOrientation, normalizeDegrees, type OrientationReading } from '../lib/geo';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { angleBetween, effectiveScreenAngle, headingFromOrientation, normalizeDegrees, type OrientationReading } from '../lib/geo';
 
 const SMOOTHING_MS = 250;
 const MIN_CHANGE_DEG = 1;
@@ -14,13 +14,27 @@ const orientationApi = () =>
   typeof DeviceOrientationEvent === 'undefined' ? undefined : (DeviceOrientationEvent as PermissionableOrientation);
 
 // `window.orientation` goes first: WebKit can report an angle that contradicts its own orientation type.
-const screenAngle = () => (typeof window.orientation === 'number' ? window.orientation : (screen.orientation?.angle ?? 0));
+const reportedAngle = () => (typeof window.orientation === 'number' ? window.orientation : (screen.orientation?.angle ?? 0));
+const screenAngle = () => effectiveScreenAngle(reportedAngle(), window.innerWidth, window.innerHeight);
+
+export interface HeadingDebug {
+  type: string;
+  ios: number | undefined;
+  iosError: number | undefined;
+  alpha: number | null;
+  beta: number | null;
+  gamma: number | null;
+  absolute: boolean;
+  reportedAngle: number;
+  usedAngle: number;
+}
 
 export function useHeading() {
   const [heading, setHeading] = useState<number | null>(null);
   const [granted, setGranted] = useState(() => typeof orientationApi()?.requestPermission !== 'function');
   const [denied, setDenied] = useState(false);
   const [weak, setWeak] = useState(false);
+  const debug = useRef<HeadingDebug | null>(null);
 
   useEffect(() => {
     if (!orientationApi()) return;
@@ -31,6 +45,20 @@ export function useHeading() {
     const onOrientation = (event: DeviceOrientationEvent) => {
       const iosError = (event as OrientationReading).webkitCompassAccuracy;
       const reading = headingFromOrientation(event, screenAngle());
+      // Android's relative events and empty events must not hide a reading that worked.
+      if (reading !== null || iosError !== undefined || !debug.current) {
+        debug.current = {
+          type: event.type,
+          ios: (event as OrientationReading).webkitCompassHeading,
+          iosError,
+          alpha: event.alpha,
+          beta: event.beta,
+          gamma: event.gamma,
+          absolute: event.absolute,
+          reportedAngle: reportedAngle(),
+          usedAngle: screenAngle(),
+        };
+      }
       if (reading === null) {
         // Android's relative events also land here, and those say nothing about the compass.
         if (iosError !== undefined && iosError < 0) {
@@ -87,5 +115,5 @@ export function useHeading() {
     }
   }, []);
 
-  return { heading, weak, needsPermission: !granted && !denied, denied, requestPermission };
+  return { heading, weak, debug, needsPermission: !granted && !denied, denied, requestPermission };
 }

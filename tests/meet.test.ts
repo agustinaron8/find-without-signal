@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accuracyCircle,
   currentTripStart,
+  effectiveScreenAngle,
   filterFix,
   hasArrived,
   haversine,
@@ -111,6 +112,20 @@ describe('headingFromOrientation', () => {
   it('ignores relative orientation, which is not a compass', () => {
     expect(headingFromOrientation({ alpha: 90, absolute: false }, 0)).toBeNull();
     expect(headingFromOrientation({ alpha: null, absolute: true }, 0)).toBeNull();
+  });
+});
+
+describe('effectiveScreenAngle', () => {
+  it('ignores a sideways angle on a page drawn upright', () => {
+    expect(effectiveScreenAngle(90, 390, 844)).toBe(0);
+    expect(effectiveScreenAngle(-90, 390, 844)).toBe(0);
+    expect(effectiveScreenAngle(270, 390, 844)).toBe(0);
+  });
+  it('keeps the angle when the page is really sideways or upside down', () => {
+    expect(effectiveScreenAngle(90, 844, 390)).toBe(90);
+    expect(effectiveScreenAngle(-90, 844, 390)).toBe(-90);
+    expect(effectiveScreenAngle(180, 390, 844)).toBe(180);
+    expect(effectiveScreenAngle(0, 390, 844)).toBe(0);
   });
 });
 
