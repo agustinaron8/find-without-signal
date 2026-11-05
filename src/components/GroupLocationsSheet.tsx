@@ -1,8 +1,10 @@
 import { Moon, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import { db, type Group, type MemberLocation } from '../db';
 import type { Position } from '../hooks/useGeolocation';
 import { formatDistance, haversine } from '../lib/geo';
 import { formatAge, LOCATION_STALE_MS } from '../lib/lastKnown';
+import { filterMembers, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 interface Props {
   group: Group;
@@ -37,7 +39,11 @@ export default function GroupLocationsSheet({
   onClose,
   now,
 }: Props) {
+  const [filter, setFilter] = useState('');
   const others = group.members.filter((m) => m.id !== group.myMemberId);
+  const lastSeen = new Map(locations.map((l) => [l.memberId, l.t]));
+  // Whoever has a location comes first, newest on top: that is who can actually be found.
+  const visible = sortMembers(filterMembers(others, filter)).sort((a, b) => (lastSeen.get(b.id) ?? 0) - (lastSeen.get(a.id) ?? 0));
   const status = syncing
     ? 'Buscando red…'
     : failing
@@ -100,8 +106,19 @@ export default function GroupLocationsSheet({
           </div>
         )}
 
+        {others.length > MEMBER_FILTER_FROM && (
+          <input
+            type="search"
+            aria-label="Buscar persona"
+            placeholder={`Buscar entre ${others.length} personas`}
+            className="w-full rounded-xl border-2 border-slate-950 p-3 text-base"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        )}
+
         <ul className="space-y-2">
-          {others.map((member) => {
+          {visible.map((member) => {
             const location = locations.find((l) => l.memberId === member.id);
             const stale = !!location && now - location.t > LOCATION_STALE_MS;
             return (

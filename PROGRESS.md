@@ -23,6 +23,8 @@ También probado en WebKit (motor de Safari, emulando iPhone 13): crear grupo, b
 
 Red saturada simulada con un proxy que cuelga, demora y corta conexiones, sobre el sitio publicado: la app abre en menos de 200 ms, el mapa carga desde lo guardado, la pantalla no se traba y los envíos se cortan solos y reintentan.
 
+Grupo de 100 personas: importar por link, buscar el nombre, lista, mapa y SMS. Sobre unas 35-40 personas el QR no entra y hay que compartir por link.
+
 ## No probado todavía
 - Modo bolsillo en teléfonos reales: que la pantalla no se apague y cuánta batería gasta.
 - Última ubicación conocida en una red saturada real.

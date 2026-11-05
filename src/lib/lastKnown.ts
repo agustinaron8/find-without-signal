@@ -8,7 +8,7 @@ const RETRY_BASE_MS = 30 * 1000;
 // In a crowd a moment of signal is what we are waiting for, so failures retry sooner than the normal pace.
 const RETRY_MAX_MS = 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15 * 1000;
-const MAX_ENTRIES = 100;
+const MAX_ENTRIES = 150;
 const IV_BYTES = 12;
 const CLOCK_SKEW_MS = 60 * 60 * 1000;
 

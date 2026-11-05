@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import QRScanner from '../components/QRScanner';
 import { db } from '../db';
 import { isIOSBrowser } from '../lib/platform';
+import { filterMembers, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 import { decodeGroup, extractPayload, mergeImportedGroup, type SharedGroup } from '../lib/share';
 
 const INVALID_MESSAGE = 'Ese código no es un grupo de Reencuentro válido.';
@@ -18,6 +19,7 @@ export default function Import() {
   const [pasted, setPasted] = useState('');
   const [error, setError] = useState('');
   const [myMemberId, setMyMemberId] = useState<string>();
+  const [memberFilter, setMemberFilter] = useState('');
   const existing = useLiveQuery(() => (group ? db.groups.get(group.id) : undefined), [group?.id]);
 
   const load = (input: string): boolean => {
@@ -72,7 +74,17 @@ export default function Import() {
           {group.members.length > 0 && (
             <fieldset className="space-y-1 rounded-xl bg-slate-900 p-4">
               <legend className="float-left mb-2 font-semibold">¿Quién sos vos?</legend>
-              {group.members.map((member) => (
+              {group.members.length > MEMBER_FILTER_FROM && (
+                <input
+                  type="search"
+                  aria-label="Buscar mi nombre"
+                  placeholder="Buscá tu nombre"
+                  className="clear-both mb-2 block w-full rounded-lg bg-slate-800 p-3 text-base"
+                  value={memberFilter}
+                  onChange={(e) => setMemberFilter(e.target.value)}
+                />
+              )}
+              {sortMembers(filterMembers(group.members, memberFilter)).map((member) => (
                 <label key={member.id} className="clear-both flex items-center gap-3 py-2">
                   <input
                     type="radio"

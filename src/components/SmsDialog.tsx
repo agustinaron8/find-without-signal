@@ -1,5 +1,7 @@
 import { X } from 'lucide-react';
+import { useState } from 'react';
 import type { Member } from '../db';
+import { filterMembers, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 import { isIOS } from '../lib/platform';
 import { buildLocationMessage, buildSmsUri } from '../lib/sms';
 import type { Position } from '../hooks/useGeolocation';
@@ -15,6 +17,7 @@ const linkClass = 'block rounded-xl bg-slate-950 p-4 text-center text-lg font-se
 export default function SmsDialog({ members, position, onClose }: SmsDialogProps) {
   const withPhone = members.filter((m) => m.phone?.trim());
   const ios = isIOS();
+  const [filter, setFilter] = useState('');
 
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-white p-4 text-slate-950" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}>
@@ -31,7 +34,17 @@ export default function SmsDialog({ members, position, onClose }: SmsDialogProps
         ) : (
           <>
             <p className="rounded-lg bg-slate-100 p-3 text-sm break-all">{buildLocationMessage(position, position.accuracy)}</p>
-            {withPhone.map((member) => (
+            {withPhone.length > MEMBER_FILTER_FROM && (
+              <input
+                type="search"
+                aria-label="Buscar persona"
+                placeholder={`Buscar entre ${withPhone.length} personas`}
+                className="w-full rounded-xl border-2 border-slate-950 p-3 text-base"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+            )}
+            {sortMembers(filterMembers(withPhone, filter)).map((member) => (
               <a key={member.id} className={linkClass} href={buildSmsUri([member.phone!], buildLocationMessage(position, position.accuracy), ios)}>
                 A {member.name}
               </a>

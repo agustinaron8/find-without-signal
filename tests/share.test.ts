@@ -3,7 +3,7 @@ import { compressToEncodedURIComponent } from 'lz-string';
 import QRCode from 'qrcode';
 import { describe, expect, it } from 'vitest';
 import type { Group } from '../src/db';
-import { buildShareUrl, decodeGroup, encodeGroup, extractPayload, mergeImportedGroup } from '../src/lib/share';
+import { buildShareUrl, decodeGroup, encodeGroup, extractPayload, MAX_MEMBERS, mergeImportedGroup } from '../src/lib/share';
 
 const group: Group = {
   id: 'g1',
@@ -107,5 +107,17 @@ describe('QR', () => {
       }
     }
     expect(jsQR(pixels, size, size)?.data).toBe(url);
+  });
+});
+
+describe('large groups', () => {
+  const members = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `m${i}`, name: `Persona ${i}`, color: '#38bdf8' }));
+  const point = { id: 'p', name: 'P', lat: 1, lng: 1 };
+
+  it('keeps everyone up to the limit, across a link', () => {
+    const decoded = decodeGroup(encodeGroup({ id: 'g', name: 'Grande', createdAt: 1, members: members(MAX_MEMBERS), meetingPoints: [point] }));
+    expect(MAX_MEMBERS).toBe(100);
+    expect(decoded?.members).toHaveLength(100);
+    expect(decoded?.members[99].name).toBe('Persona 99');
   });
 });

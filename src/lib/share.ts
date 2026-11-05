@@ -2,7 +2,7 @@ import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from
 import type { Group, MeetingPoint, Member } from '../db';
 
 const PAYLOAD_VERSION = 1;
-const MAX_MEMBERS = 50;
+export const MAX_MEMBERS = 100;
 const MAX_POINTS = 20;
 const MAX_TEXT = 2000;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;

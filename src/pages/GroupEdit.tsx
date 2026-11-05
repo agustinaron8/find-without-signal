@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { db, type Group, type MeetingPoint, type Member } from '../db';
 import { parseCoords } from '../lib/geo';
+import { MAX_MEMBERS } from '../lib/share';
 
 const MapView = lazy(() => import('../components/MapView'));
 
@@ -168,14 +169,15 @@ export default function GroupEdit() {
           ))}
           <button
             type="button"
-            className="w-full rounded-xl bg-slate-800 p-3 font-semibold"
+            disabled={group.members.length >= MAX_MEMBERS}
+            className="w-full rounded-xl bg-slate-800 p-3 font-semibold disabled:opacity-50"
             onClick={() =>
               patch({
                 members: [...group.members, { id: crypto.randomUUID(), name: '', color: nextColor(group.members) }],
               })
             }
           >
-            Agregar persona
+            {group.members.length >= MAX_MEMBERS ? `Máximo ${MAX_MEMBERS} personas` : 'Agregar persona'}
           </button>
         </section>
 

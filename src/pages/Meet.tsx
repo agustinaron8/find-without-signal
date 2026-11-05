@@ -28,6 +28,7 @@ import {
   shouldRecordTrackPoint,
 } from '../lib/geo';
 import { formatAge, LOCATION_STALE_MS } from '../lib/lastKnown';
+import { MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 const MapView = lazy(() => import('../components/MapView'));
 
@@ -91,10 +92,11 @@ export default function Meet() {
     const list = (group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: p.description }));
     (personal ?? []).forEach((p) => list.push({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: undefined }));
     if (trackStart) list.push({ id: TRACK_START_ID, name: 'Donde arranqué', lat: trackStart.lat, lng: trackStart.lng, description: undefined });
-    locations.forEach((l) => {
+    const named = locations.flatMap((l) => {
       const member = group?.members.find((m) => m.id === l.memberId);
-      if (member) list.push({ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, description: undefined });
+      return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, description: undefined }] : [];
     });
+    list.push(...sortMembers(named));
     return list;
   }, [group, personal, trackStart, locations]);
 
@@ -107,12 +109,15 @@ export default function Meet() {
     () => [
       ...(group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, color: '#dc2626' })),
       ...(personal ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, color: PERSONAL_COLOR })),
-      ...locations.flatMap((l) => {
-        const member = group?.members.find((m) => m.id === l.memberId);
-        return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, color: member.color }] : [];
-      }),
+      // With a big group the labels would bury the meeting points, so only the chosen person stays.
+      ...locations
+        .filter((l) => locations.length <= MEMBER_FILTER_FROM || MEMBER_PREFIX + l.memberId === destination?.id)
+        .flatMap((l) => {
+          const member = group?.members.find((m) => m.id === l.memberId);
+          return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, color: member.color }] : [];
+        }),
     ],
-    [group, personal, locations],
+    [group, personal, locations, destination?.id],
   );
 
   const overlay = useMemo(
