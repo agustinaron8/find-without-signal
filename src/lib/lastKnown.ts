@@ -1,0 +1,132 @@
+import type { MemberLocation } from '../db';
+
+export const LOCATION_ENDPOINT = '/api/loc';
+export const LOCATION_MAX_AGE_MS = 72 * 60 * 60 * 1000;
+export const LOCATION_STALE_MS = 15 * 60 * 1000;
+export const SYNC_INTERVAL_MS = 3 * 60 * 1000;
+const RETRY_BASE_MS = 30 * 1000;
+const REQUEST_TIMEOUT_MS = 15 * 1000;
+const MAX_ENTRIES = 100;
+const IV_BYTES = 12;
+const CLOCK_SKEW_MS = 60 * 60 * 1000;
+
+const encoder = new TextEncoder();
+
+const toBase64Url = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+const fromBase64Url = (value: string) =>
+  Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+
+const sha256 = async (value: string) =>
+  new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)));
+
+export interface LocationKeys {
+  channel: string;
+  key: CryptoKey;
+}
+
+// The group id is random and only travels in the share link's hash, so every phone holding the
+// group can derive these and the server cannot. It also means groups shared before this feature
+// existed work without sharing them again.
+export async function deriveLocationKeys(groupId: string): Promise<LocationKeys> {
+  const channel = toBase64Url((await sha256(`reencuentro/channel/${groupId}`)).slice(0, 16));
+  const raw = await sha256(`reencuentro/key/${groupId}`);
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  return { channel, key };
+}
+
+export const memberTag = async (channel: string, memberId: string): Promise<string> =>
+  toBase64Url((await sha256(`${channel}/${memberId}`)).slice(0, 16));
+
+export interface LocationFix {
+  memberId: string;
+  lat: number;
+  lng: number;
+  acc: number;
+  t: number;
+}
+
+export async function encryptLocation(key: CryptoKey, fix: LocationFix): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const plain = encoder.encode(JSON.stringify({ i: fix.memberId, a: fix.lat, o: fix.lng, c: Math.round(fix.acc), t: fix.t }));
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
+  const out = new Uint8Array(IV_BYTES + cipher.length);
+  out.set(iv);
+  out.set(cipher, IV_BYTES);
+  return toBase64Url(out);
+}
+
+const finite = (value: unknown, limit: number): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit;
+
+// Anything the server returns is untrusted: whoever learns the channel can write garbage to it.
+export async function decryptLocation(key: CryptoKey, data: string, now = Date.now()): Promise<LocationFix | null> {
+  try {
+    const bytes = fromBase64Url(data);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(0, IV_BYTES) }, key, bytes.slice(IV_BYTES));
+    const raw = JSON.parse(new TextDecoder().decode(plain));
+    if (typeof raw?.i !== 'string' || !finite(raw.a, 90) || !finite(raw.o, 180) || !finite(raw.c, 1e7)) return null;
+    if (!finite(raw.t, Number.MAX_SAFE_INTEGER) || raw.t > now + CLOCK_SKEW_MS) return null;
+    return { memberId: raw.i, lat: raw.a, lng: raw.o, acc: raw.c, t: raw.t };
+  } catch {
+    return null;
+  }
+}
+
+export function nextSyncDelay(failures: number, jitter = Math.random()): number {
+  if (failures === 0) return SYNC_INTERVAL_MS;
+  return Math.min(RETRY_BASE_MS * 2 ** (failures - 1), SYNC_INTERVAL_MS) * (0.75 + jitter * 0.5);
+}
+
+export interface SyncWrite {
+  m: string;
+  d: string | null;
+}
+
+// One request both writes and reads, so a moment of signal is enough for both.
+export async function exchangeLocations(channel: string, write?: SyncWrite, fetcher: typeof fetch = fetch): Promise<string[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetcher(LOCATION_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ c: channel, ...write }),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    const { e } = (await response.json()) as { e?: Record<string, unknown> };
+    return Object.values(e ?? {})
+      .filter((v): v is string => typeof v === 'string')
+      .slice(0, MAX_ENTRIES);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// The server may hand back an older copy, and a location must never move backwards in time.
+export function newestLocations(
+  groupId: string,
+  fixes: LocationFix[],
+  stored: MemberLocation[],
+  allowedMembers: Set<string>,
+): MemberLocation[] {
+  const newest = new Map(stored.map((s) => [s.memberId, s.t]));
+  const updates = new Map<string, MemberLocation>();
+  for (const { memberId, lat, lng, acc, t } of fixes) {
+    if (!allowedMembers.has(memberId) || t <= (newest.get(memberId) ?? 0)) continue;
+    newest.set(memberId, t);
+    updates.set(memberId, { groupId, memberId, lat, lng, acc, t });
+  }
+  return [...updates.values()];
+}
+
+export function formatAge(ms: number): string {
+  const minutes = Math.floor(Math.max(0, ms) / 60000);
+  if (minutes < 1) return 'recién';
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 || hours >= 6 ? `hace ${hours} h` : `hace ${hours} h ${rest} min`;
+}

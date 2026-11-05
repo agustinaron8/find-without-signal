@@ -44,7 +44,8 @@ export default function Help() {
           <ul className="list-disc space-y-1 pl-5">
             <li>
               <strong>No se ve a los demás en vivo.</strong> Ningún navegador puede hacerlo sin red. Por eso el plan es acordar
-              un punto y un horario.
+              un punto y un horario. Si aparece algo de red, en "Ubicación del grupo" vas a ver el último lugar que mandó cada uno,
+              con su antigüedad.
             </li>
             <li>No se puede bajar un mapa nuevo.</li>
             <li>
@@ -72,7 +73,11 @@ export default function Help() {
 
         <section className={card}>
           <h2 className="text-lg font-bold">Privacidad</h2>
-          <p>Nada sale de tu teléfono salvo lo que compartís vos: el link, el QR o el SMS. No hay cuentas ni servidores con tus datos.</p>
+          <p>
+            No hay cuentas. Nada sale de tu teléfono salvo lo que compartís vos: el link, el QR, el SMS y, solo si lo activás en
+            "Ubicación del grupo", tu ubicación. Esa viaja cifrada con una clave que tiene únicamente tu grupo: nuestro servidor no
+            puede leerla y se borra a los 3 días.
+          </p>
         </section>
       </main>
     </>

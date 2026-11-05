@@ -19,7 +19,10 @@ Probado sobre el sitio publicado, en Chromium: crear grupo, bajar el mapa, cerra
 
 También probado en WebKit (motor de Safari, emulando iPhone 13): crear grupo, bajar mapa, QR en pantalla, radar, flecha, SMS, y abrir la app con el servidor apagado.
 
+Última ubicación conocida: dos teléfonos simulados contra un servidor de prueba (activar, ver al otro, red caída, recargar, moverse, desactivar y borrar). Ver abajo si ya corre contra la base real.
+
 ## No probado todavía
+- Última ubicación conocida en una red saturada real.
 - Que los datos sobrevivan a cerrar la app en iPhone: el WebKit de esta PC no guarda el caché en disco, así que esa parte solo se puede ver en un iPhone real. En Chromium sí se probó.
 - Escanear QR con la cámara en iPhone.
 - Duración real de más de 24 h: el código no tiene vencimientos, pero nadie esperó ese tiempo. Por eso conviene instalar ya y volver a abrir la app el domingo en modo avión.
@@ -28,7 +31,6 @@ También probado en WebKit (motor de Safari, emulando iPhone 13): crear grupo, b
 - Una red saturada de verdad.
 
 ## Afuera a propósito
-- Última ubicación conocida online (requiere backend, y sirve poco con la red saturada).
 - Búsqueda de direcciones (opcional en el spec; se marcan tocando el mapa o pegando un link).
 - Compartir el grupo por SMS y exportar el recorrido a GPX.
 
@@ -40,4 +42,5 @@ También probado en WebKit (motor de Safari, emulando iPhone 13): crear grupo, b
 - [ ] La pantalla no se apaga en el Modo Encuentro.
 - [ ] Brújula: comparar contra la brújula nativa del teléfono (±15°).
 - [ ] Instalar ya, cerrar todo, y el domingo abrir en modo avión: grupo, mapa y flecha siguen ahí.
+- [ ] Última ubicación: activarla en dos teléfonos y confirmar que cada uno ve al otro.
 - [ ] Antes del evento: abrir el grupo y confirmar que el checklist "Listo para usar sin señal" está completo, en cada teléfono.

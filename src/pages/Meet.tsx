@@ -1,14 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Bookmark, ClipboardPaste, Compass as CompassIcon, Flashlight, Map as MapIcon, MessageSquare, Undo2 } from 'lucide-react';
+import { ArrowLeft, Bookmark, ClipboardPaste, Compass as CompassIcon, Flashlight, Map as MapIcon, MessageSquare, Undo2, Users } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Compass from '../components/Compass';
+import GroupLocationsSheet from '../components/GroupLocationsSheet';
 import type { MapPoint } from '../components/MapView';
 import SignalScreen from '../components/SignalScreen';
 import SmsDialog from '../components/SmsDialog';
 import { db, type TrackPoint } from '../db';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useHeading } from '../hooks/useHeading';
+import { useLastKnown } from '../hooks/useLastKnown';
 import { useWakeLock } from '../hooks/useWakeLock';
 import {
   bearing,
@@ -24,10 +26,12 @@ import {
   parseCoords,
   shouldRecordTrackPoint,
 } from '../lib/geo';
+import { formatAge, LOCATION_STALE_MS } from '../lib/lastKnown';
 
 const MapView = lazy(() => import('../components/MapView'));
 
 const TRACK_START_ID = 'track-start';
+const MEMBER_PREFIX = 'member-';
 const PERSONAL_COLOR = '#16a34a';
 const GPS_HEADING_MIN_SPEED_MS = 0.5;
 const TRACK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -48,12 +52,13 @@ export default function Meet() {
   const { position, error: geoError } = useGeolocation();
   const { heading: compassHeading, needsPermission, denied, requestPermission } = useHeading();
   useWakeLock();
+  const lastKnown = useLastKnown(group, position);
 
   const storageKey = `meet-destination-${id}`;
   // Persisted because opening the SMS app can make iOS reload this page.
   const [destinationId, setDestinationId] = useState<string | null>(() => localStorage.getItem(storageKey));
   const [view, setView] = useState<'radar' | 'map'>('radar');
-  const [sheet, setSheet] = useState<'sms' | 'paste' | 'save' | 'signal' | null>(null);
+  const [sheet, setSheet] = useState<'sms' | 'paste' | 'save' | 'signal' | 'group' | null>(null);
   const [draftName, setDraftName] = useState('');
   const [pasted, setPasted] = useState('');
   const [sheetError, setSheetError] = useState('');
@@ -80,12 +85,17 @@ export default function Meet() {
   }, [position, track, id]);
 
   const trackStart = track && currentTripStart(track);
+  const locations = lastKnown.locations;
   const destinations = useMemo(() => {
     const list = (group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: p.description }));
     (personal ?? []).forEach((p) => list.push({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: undefined }));
     if (trackStart) list.push({ id: TRACK_START_ID, name: 'Donde arranqué', lat: trackStart.lat, lng: trackStart.lng, description: undefined });
+    locations.forEach((l) => {
+      const member = group?.members.find((m) => m.id === l.memberId);
+      if (member) list.push({ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, description: undefined });
+    });
     return list;
-  }, [group, personal, trackStart]);
+  }, [group, personal, trackStart, locations]);
 
   const destination =
     destinations.find((d) => d.id === destinationId) ??
@@ -96,8 +106,12 @@ export default function Meet() {
     () => [
       ...(group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, color: '#dc2626' })),
       ...(personal ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, color: PERSONAL_COLOR })),
+      ...locations.flatMap((l) => {
+        const member = group?.members.find((m) => m.id === l.memberId);
+        return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, color: member.color }] : [];
+      }),
     ],
-    [group, personal],
+    [group, personal, locations],
   );
 
   const overlay = useMemo(
@@ -128,6 +142,10 @@ export default function Meet() {
   const poorFix = !!position && isPoorFix(position.accuracy);
   const arrived = distance !== null && !!position && hasArrived(distance, position.accuracy);
   const plan = group.planTimes?.length ? nextPlanTime(group.planTimes, now) : null;
+  const destinationLocation = destination?.id.startsWith(MEMBER_PREFIX)
+    ? locations.find((l) => MEMBER_PREFIX + l.memberId === destination.id)
+    : undefined;
+  const locationAge = destinationLocation ? now.getTime() - destinationLocation.t : 0;
 
   const openSheet = (next: 'paste' | 'save' | 'sms') => {
     setDraftName('');
@@ -207,7 +225,7 @@ export default function Meet() {
               <p className="text-6xl" aria-hidden>
                 📍
               </p>
-              <p className="text-4xl font-black">¡Estás en el punto!</p>
+              <p className="text-4xl font-black">{destinationLocation ? `Estás donde estaba ${destination?.name}` : '¡Estás en el punto!'}</p>
               <ArrivalBuzz />
             </>
           ) : (
@@ -240,6 +258,11 @@ export default function Meet() {
           )}
           {distance !== null && !arrived && <p className="text-xl font-semibold">{formatWalkTime(distance)} caminando</p>}
           {destination?.description && <p className="text-lg">{destination.description}</p>}
+          {destinationLocation && (
+            <p data-testid="location-age" className={`text-lg font-bold ${locationAge > LOCATION_STALE_MS ? 'text-red-800' : ''}`}>
+              Estaba ahí {formatAge(locationAge)}, puede haberse movido
+            </p>
+          )}
 
           {position && !poorFix && (
             <p data-testid="accuracy" className="text-slate-700">
@@ -270,8 +293,11 @@ export default function Meet() {
       )}
 
       <nav className="grid grid-cols-2 gap-2 p-3">
-        <button type="button" className={`${primaryButton} col-span-2`} onClick={() => openSheet('sms')}>
-          <MessageSquare size={22} /> Mandar mi ubicación por SMS
+        <button type="button" className={primaryButton} onClick={() => openSheet('sms')}>
+          <MessageSquare size={22} className="shrink-0" /> Mandar mi ubicación por SMS
+        </button>
+        <button type="button" className={primaryButton} onClick={() => setSheet('group')}>
+          <Users size={22} className="shrink-0" /> Ubicación del grupo
         </button>
         <button type="button" className={bigButton} onClick={() => setView(view === 'radar' ? 'map' : 'radar')}>
           {view === 'radar' ? <MapIcon size={20} /> : <CompassIcon size={20} />}
@@ -294,6 +320,26 @@ export default function Meet() {
       </nav>
 
       {sheet === 'signal' && <SignalScreen onClose={() => setSheet(null)} />}
+
+      {sheet === 'group' && (
+        <GroupLocationsSheet
+          group={group}
+          locations={locations}
+          position={position}
+          sharing={lastKnown.sharing}
+          onSharingChange={lastKnown.setSharing}
+          lastSync={lastKnown.lastSync}
+          failing={lastKnown.failing}
+          syncing={lastKnown.syncing}
+          onSyncNow={lastKnown.syncNow}
+          onGoTo={(memberId) => {
+            chooseDestination(MEMBER_PREFIX + memberId);
+            setSheet(null);
+          }}
+          onClose={() => setSheet(null)}
+          now={now.getTime()}
+        />
+      )}
 
       {sheet === 'sms' && <SmsDialog members={group.members.filter((m) => m.id !== group.myMemberId)} position={position} onClose={() => setSheet(null)} />}
 

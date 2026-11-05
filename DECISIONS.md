@@ -13,3 +13,7 @@
 - "Volver por donde vine" usa el inicio del recorrido actual: se corta solo tras 12 h sin puntos, para servir en eventos de varios días sin mandarte a donde probaste la app en casa.
 - Modo Encuentro en fondo blanco y texto negro: es lo que mejor se lee al sol.
 - La flecha toma primero `window.orientation`: en WebKit se observó `screen.orientation.angle` en 90 con tipo `portrait-primary`.
+- Última ubicación conocida: la clave y el canal se derivan del id del grupo, que solo viaja en el hash del link. Así funciona con grupos ya compartidos, sin rehacer el QR, y el servidor solo ve texto cifrado.
+- Compartir la ubicación es opcional para cada persona y arranca apagado. Al apagarlo se borra del servidor; si no hay red, se reintenta hasta lograrlo.
+- Un solo POST escribe y lee, para aprovechar un momento de señal. Se manda cada 3 minutos y solo con el Modo Encuentro abierto; los datos expiran a las 72 h.
+- `/api/loc` no tiene rate limit: un abuso solo agotaría la cuota de la base, y eso apaga esta función sin afectar puntos, flecha ni mapa.

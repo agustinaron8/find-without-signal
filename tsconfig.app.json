@@ -16,6 +16,6 @@
     "tsBuildInfoFile": "./node_modules/.tmp/app.tsbuildinfo",
     "types": ["vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src", "tests"],
+  "include": ["src", "tests", "api"],
   "exclude": ["src/sw.ts"]
 }

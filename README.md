@@ -34,6 +34,7 @@ Cada push a `main` despliega en Vercel como sitio estático. `vercel.json` manda
 | Service worker | `src/sw.ts` | Precachea la app y sirve el mapa con CacheFirst desde `map-cache-v1`, que sobrevive a las actualizaciones |
 | Datos | `src/db/` | Grupos, recorrido y puntos personales en IndexedDB (Dexie) |
 | Mapa offline | `src/lib/tiles.ts` | Calcula la zona y baja estilo, TileJSON, sprites, glifos y tiles z10-14 |
+| Última ubicación | `src/lib/lastKnown.ts`, `src/hooks/useLastKnown.ts`, `api/loc.ts` | Opcional. Necesita Upstash Redis conectado en Vercel; sin él, el resto de la app funciona igual |
 | Compartir | `src/lib/share.ts` | Codifica el grupo en el hash de la URL y valida lo que se importa, porque no es confiable |
 | Geo | `src/lib/geo.ts` | Distancia, rumbo, parseo de coordenadas y lógica de llegada |
 | SMS | `src/lib/sms.ts` | Arma el mensaje (un solo segmento GSM-7) y el URI según la plataforma |

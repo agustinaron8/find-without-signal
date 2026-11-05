@@ -56,10 +56,20 @@ export interface PersonalPoint {
   createdAt: number;
 }
 
+export interface MemberLocation {
+  groupId: string;
+  memberId: string;
+  lat: number;
+  lng: number;
+  acc: number;
+  t: number;
+}
+
 class ReencuentroDB extends Dexie {
   groups!: Table<Group, string>;
   trackPoints!: Table<TrackPoint, number>;
   personalPoints!: Table<PersonalPoint, string>;
+  memberLocations!: Table<MemberLocation, [string, string]>;
 
   constructor() {
     super('reencuentro');
@@ -68,15 +78,19 @@ class ReencuentroDB extends Dexie {
       trackPoints: '++id, groupId, t',
       personalPoints: 'id, groupId',
     });
+    this.version(2).stores({
+      memberLocations: '[groupId+memberId], groupId',
+    });
   }
 }
 
 export const db = new ReencuentroDB();
 
 export async function deleteGroup(id: string): Promise<void> {
-  await db.transaction('rw', db.groups, db.trackPoints, db.personalPoints, async () => {
+  await db.transaction('rw', [db.groups, db.trackPoints, db.personalPoints, db.memberLocations], async () => {
     await db.groups.delete(id);
     await db.trackPoints.where('groupId').equals(id).delete();
     await db.personalPoints.where('groupId').equals(id).delete();
+    await db.memberLocations.where('groupId').equals(id).delete();
   });
 }
