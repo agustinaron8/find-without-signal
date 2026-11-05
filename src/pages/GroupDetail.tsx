@@ -3,6 +3,7 @@ import { QrCode, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import OfflineChecklist from '../components/OfflineChecklist';
 import OfflineMapCard from '../components/OfflineMapCard';
 import QRCode from '../components/QRCode';
 import { db, deleteGroup } from '../db';
@@ -61,6 +62,7 @@ export default function GroupDetail() {
         </Link>
 
         <OfflineMapCard group={group} />
+        <OfflineChecklist group={group} />
 
         {group.plan && (
           <section className="rounded-xl bg-slate-900 p-4">

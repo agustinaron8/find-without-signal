@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronRight, CircleHelp, Plus, QrCode } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
+import InstallBanner from '../components/InstallBanner';
 import { db } from '../db';
 
 const countLabel = (count: number, singular: string, plural: string) =>
@@ -14,6 +15,8 @@ export default function Home() {
     <>
       <Header title="Reencuentro" />
       <main className="mx-auto max-w-md space-y-4 p-4">
+        <InstallBanner />
+
         {groups?.length === 0 && (
           <div className="rounded-xl bg-slate-900 p-5 text-slate-300">
             <p className="font-semibold text-slate-50">Todavía no tenés grupos</p>

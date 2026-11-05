@@ -1,0 +1,76 @@
+import Header from '../components/Header';
+
+const card = 'space-y-2 rounded-xl bg-slate-900 p-4';
+
+export default function Help() {
+  return (
+    <>
+      <Header title="Ayuda" backTo="/" />
+      <main className="mx-auto max-w-md space-y-4 p-4">
+        <section className={card}>
+          <h2 className="text-lg font-bold">Instalar en iPhone</h2>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>Abrí esta página en Safari.</li>
+            <li>Tocá Compartir y después "Agregar a inicio".</li>
+            <li>Abrí Reencuentro desde el ícono de inicio.</li>
+            <li>Recién ahí creá o importá tus grupos.</li>
+          </ol>
+          <p className="rounded-lg bg-amber-950 p-3 text-sm text-amber-100">
+            <strong>Importante:</strong> en iPhone, la app instalada tiene un almacenamiento separado del de Safari. Lo que
+            guardes en Safari no aparece en la app instalada.
+          </p>
+        </section>
+
+        <section className={card}>
+          <h2 className="text-lg font-bold">Instalar en Android</h2>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>Abrí esta página en Chrome.</li>
+            <li>Tocá el botón "Instalar", o el menú ⋮ y "Instalar app".</li>
+          </ol>
+        </section>
+
+        <section className={card}>
+          <h2 className="text-lg font-bold">Qué funciona sin señal</h2>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>La app, tus grupos y el plan de reencuentro.</li>
+            <li>El GPS, la brújula, la flecha y la distancia al punto.</li>
+            <li>El mapa de la zona, si lo bajaste antes.</li>
+            <li>Pasar un grupo a otro teléfono por QR.</li>
+          </ul>
+        </section>
+
+        <section className={card}>
+          <h2 className="text-lg font-bold">Qué no funciona</h2>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <strong>No se ve a los demás en vivo.</strong> Ningún navegador puede hacerlo sin red. Por eso el plan es acordar
+              un punto y un horario.
+            </li>
+            <li>No se puede bajar un mapa nuevo.</li>
+            <li>
+              El SMS usa la red del celular. Con mucha gente puede tardar o no salir, aunque suele andar mejor que los datos.
+            </li>
+          </ul>
+        </section>
+
+        <section className={card}>
+          <h2 className="text-lg font-bold">Consejos para un evento con mucha gente</h2>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Prepará todo en casa con WiFi, el día anterior. En el lugar puede no haber red para nada.</li>
+            <li>Acordá el punto y los horarios antes de separarse. Es lo único que funciona seguro.</li>
+            <li>Elegí puntos fáciles de reconocer y, si podés, en el borde del predio: el centro va a ser intransitable.</li>
+            <li>Probá la app en modo avión antes de salir.</li>
+            <li>Llevá batería externa: el GPS con la pantalla prendida consume mucho.</li>
+            <li>Sin señal, el GPS puede tardar hasta un minuto en ubicarte la primera vez.</li>
+            <li>La brújula se confunde cerca de metal e imanes. Alejá el teléfono de otros aparatos y confirmá con la distancia: si baja, vas bien.</li>
+          </ul>
+        </section>
+
+        <section className={card}>
+          <h2 className="text-lg font-bold">Privacidad</h2>
+          <p>Nada sale de tu teléfono salvo lo que compartís vos: el link, el QR o el SMS. No hay cuentas ni servidores con tus datos.</p>
+        </section>
+      </main>
+    </>
+  );
+}
