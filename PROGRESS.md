@@ -19,7 +19,7 @@ Probado sobre el sitio publicado, en Chromium: crear grupo, bajar el mapa, cerra
 
 También probado en WebKit (motor de Safari, emulando iPhone 13): crear grupo, bajar mapa, QR en pantalla, radar, flecha, SMS, y abrir la app con el servidor apagado.
 
-Última ubicación conocida: dos teléfonos simulados contra un servidor de prueba (activar, ver al otro, red caída, recargar, moverse, desactivar y borrar). Ver abajo si ya corre contra la base real.
+Última ubicación conocida: dos teléfonos simulados contra un servidor de prueba (activar, ver al otro, red caída, recargar, moverse, desactivar y borrar), y Chromium con WebKit contra el sitio publicado y la base real.
 
 ## No probado todavía
 - Última ubicación conocida en una red saturada real.

@@ -25,7 +25,7 @@ export function useGeolocation() {
     const start = () => {
       if (watchId !== null) return;
       watchId = navigator.geolocation.watchPosition(
-        ({ coords, timestamp }) => {
+        ({ coords }) => {
           setError(null);
           setPosition({
             lat: coords.latitude,
@@ -33,7 +33,8 @@ export function useGeolocation() {
             accuracy: coords.accuracy,
             heading: coords.heading,
             speed: coords.speed,
-            t: timestamp,
+            // Not the fix's own timestamp: WebKit was seen reporting it in microseconds.
+            t: Date.now(),
           });
         },
         (err) => {
