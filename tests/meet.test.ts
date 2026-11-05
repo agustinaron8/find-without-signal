@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   accuracyCircle,
+  currentTrip,
   currentTripStart,
   effectiveScreenAngle,
   filterFix,
@@ -67,6 +68,21 @@ describe('currentTripStart', () => {
   });
   it('handles an empty track', () => {
     expect(currentTripStart([])).toBeUndefined();
+  });
+});
+
+describe('currentTrip', () => {
+  const hours = (h: number) => ({ t: h * 60 * 60 * 1000 });
+  it('leaves out a test from another day', () => {
+    const points = [hours(0), hours(1), hours(20), hours(25)];
+    expect(currentTrip(points)).toEqual([points[2], points[3]]);
+  });
+  it('keeps a whole event with short gaps', () => {
+    const points = [hours(0), hours(5), hours(11)];
+    expect(currentTrip(points)).toEqual(points);
+  });
+  it('handles an empty track', () => {
+    expect(currentTrip([])).toEqual([]);
   });
 });
 

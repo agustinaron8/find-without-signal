@@ -110,7 +110,7 @@ export function useHeading() {
       setDenied(result === 'denied');
       return result === 'granted';
     } catch {
-      setDenied(true);
+      // Thrown when not called from a tap, which says nothing about what the person wants.
       return false;
     }
   }, []);

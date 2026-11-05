@@ -19,6 +19,7 @@ import {
   bearing,
   cardinalName,
   combinedAccuracy,
+  currentTrip,
   currentTripStart,
   formatDistance,
   formatWalkTime,
@@ -105,6 +106,8 @@ export default function Meet() {
   }, [position, track, id]);
 
   const trackStart = track && currentTripStart(track);
+  // Older points would join a test at home to the event with a line across the city.
+  const trip = useMemo(() => (track ? currentTrip(track) : []), [track]);
   const locations = lastKnown.locations;
   const roster = useMemo(() => groupRoster(group?.members ?? [], locations, group?.myMemberId), [group, locations]);
   const destinations = useMemo(() => {
@@ -142,10 +145,10 @@ export default function Meet() {
   const overlay = useMemo(
     () => ({
       position: position ?? undefined,
-      track: track ?? [],
+      track: trip,
       destination: destination ? { lat: destination.lat, lng: destination.lng } : undefined,
     }),
-    [position, track, destination],
+    [position, trip, destination],
   );
 
   if (group === undefined) return <div className="min-h-screen bg-white" />;
@@ -206,6 +209,13 @@ export default function Meet() {
     }
   };
 
+  const removePersonal = async (pointId: string, name: string) => {
+    if (!window.confirm(`¿Borrar "${name}"?`)) return;
+    await db.personalPoints.delete(pointId);
+    setDestinationId(null);
+    localStorage.removeItem(storageKey);
+  };
+
   const saveHere = () => {
     if (!position) return setSheetError('Todavía no tengo tu ubicación.');
     savePersonal(draftName.trim() || 'Mi lugar', position.lat, position.lng, position.accuracy);
@@ -219,7 +229,8 @@ export default function Meet() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-white text-slate-950" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom))' }}>
+    // iPhone forgets the compass permission on every launch and only asks from a tap, so any first tap will do.
+    <div onClickCapture={() => void (needsPermission && requestPermission())} className="flex min-h-screen flex-col bg-white text-slate-950" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom))' }}>
       <header className="flex items-center gap-2 p-3">
         <Link to={`/group/${id}`} aria-label="Volver" className="p-2">
           <ArrowLeft size={28} />
@@ -334,7 +345,7 @@ export default function Meet() {
             </p>
           )}
           {needsPermission && (
-            <button type="button" className="flex items-center gap-2 rounded-xl bg-sky-300 p-4 text-lg font-bold" onClick={requestPermission}>
+            <button type="button" className="flex items-center gap-2 rounded-xl bg-sky-300 p-4 text-lg font-bold">
               <CompassIcon size={24} /> Activar brújula
             </button>
           )}
@@ -374,6 +385,11 @@ export default function Meet() {
             </p>
           )}
 
+          {destination && personal?.some((p) => p.id === destination.id) && (
+            <button type="button" className="p-2 text-sm font-semibold text-slate-700 underline" onClick={() => removePersonal(destination.id, destination.name)}>
+              Borrar este lugar guardado
+            </button>
+          )}
           {gpsStale && (
             <p data-testid="gps-stale" role="alert" className="rounded-lg bg-red-100 p-3 font-semibold text-red-900">
               El GPS no se actualiza ({gpsAge < 60000 ? 'menos de 1 min' : formatAge(gpsAge)}). La flecha y la distancia pueden estar mal.
@@ -404,7 +420,7 @@ export default function Meet() {
               {formatDistance(distance)} · {formatWalkTime(distance)}
             </p>
           )}
-          {!!track?.length && (
+          {trip.length > 0 && (
             <button type="button" className="mt-2 flex items-center justify-center gap-2 self-center p-2 font-semibold underline" onClick={resetTrack}>
               <RotateCcw size={18} /> Reiniciar recorrido
             </button>

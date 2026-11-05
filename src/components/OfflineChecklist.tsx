@@ -5,7 +5,7 @@ import type { Group } from '../db';
 import IdentityForm from './IdentityForm';
 import { useHeading } from '../hooks/useHeading';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
-import { isIOSBrowser, isStandalone } from '../lib/platform';
+import { isIOS, isIOSBrowser, isStandalone } from '../lib/platform';
 import { areaCoversPoints } from '../lib/tiles';
 
 const actionClass = 'mt-2 block w-full rounded-lg bg-slate-800 p-2 text-center text-sm font-semibold';
@@ -64,9 +64,11 @@ export default function OfflineChecklist({ group }: { group: Group }) {
   return (
     <section className="rounded-xl bg-slate-900 p-4">
       <h2 className="font-semibold">Listo para usar sin señal</h2>
-      <p className="mt-1 text-sm text-slate-400">
-        En iPhone, ubicación y brújula se vuelven a pedir al abrir la app de nuevo. Es una regla de Apple y funciona sin señal: aceptá cuando aparezca.
-      </p>
+      {isIOS() && (
+        <p className="mt-1 text-sm text-slate-400">
+          Al abrir la app, el iPhone vuelve a pedir ubicación y brújula. Es una regla de Apple: aceptá cuando aparezca.
+        </p>
+      )}
       <ul className="mt-3 space-y-3">
         <Item ok={isStandalone()} label="App instalada">
           {canInstall && (
@@ -88,24 +90,29 @@ export default function OfflineChecklist({ group }: { group: Group }) {
         <Item ok={mapReady} label="Mapa de la zona bajado">
           <p className="mt-1 text-sm text-slate-400">Bajalo en la tarjeta "Mapa sin señal".</p>
         </Item>
-        <Item ok={location === 'granted'} label="Permiso de ubicación">
-          {location === 'denied' ? (
-            <p className="mt-1 text-sm text-amber-200">Está bloqueado. Activalo en los ajustes del teléfono.</p>
-          ) : (
-            <button type="button" disabled={location === 'asking'} className={actionClass} onClick={askLocation}>
-              {location === 'asking' ? 'Pidiendo ubicación…' : 'Dar permiso de ubicación'}
-            </button>
-          )}
-        </Item>
-        <Item ok={compassOk} label="Permiso de brújula">
-          {denied ? (
-            <p className="mt-1 text-sm text-amber-200">Sin brújula, la flecha se orienta al caminar. Para activarla, cerrá la app del todo y volvé a abrirla.</p>
-          ) : (
-            <button type="button" className={actionClass} onClick={askCompass}>
-              Dar permiso de brújula
-            </button>
-          )}
-        </Item>
+        {/* iPhone asks again on every launch, so a tick here would promise something it does not keep. */}
+        {!isIOS() && (
+          <>
+            <Item ok={location === 'granted'} label="Permiso de ubicación">
+              {location === 'denied' ? (
+                <p className="mt-1 text-sm text-amber-200">Está bloqueado. Activalo en los ajustes del teléfono.</p>
+              ) : (
+                <button type="button" disabled={location === 'asking'} className={actionClass} onClick={askLocation}>
+                  {location === 'asking' ? 'Pidiendo ubicación…' : 'Dar permiso de ubicación'}
+                </button>
+              )}
+            </Item>
+            <Item ok={compassOk} label="Permiso de brújula">
+              {denied ? (
+                <p className="mt-1 text-sm text-amber-200">Sin brújula, la flecha se orienta al caminar. Para activarla, cerrá la app del todo y volvé a abrirla.</p>
+              ) : (
+                <button type="button" className={actionClass} onClick={askCompass}>
+                  Dar permiso de brújula
+                </button>
+              )}
+            </Item>
+          </>
+        )}
         <Item ok={!!group.myMemberId} label="Dijiste quién sos">
           <IdentityForm group={group} dark />
         </Item>

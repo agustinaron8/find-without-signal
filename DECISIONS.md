@@ -35,4 +35,6 @@
 - "Reiniciar recorrido" borra la línea violeta y también "Donde arranqué", que sale de esa misma línea; por eso pide confirmación y lo avisa.
 - Con la página en vertical se ignora un ángulo de pantalla de ±90°: si la página no giró, la brújula ya está referida a la parte de arriba del teléfono. Tocar la distancia abre los datos crudos de los sensores, para diagnosticar la flecha en un teléfono real.
 - En iPhone, el permiso de brújula dura lo que dura la app abierta y no hay API para conservarlo ni para consultarlo. Por eso se pide con un botón en cada apertura y la app lo explica; los datos no dependen de ese permiso.
+- El mapa dibuja solo el recorrido actual (corte de 12 h sin puntos, como "Donde arranqué"), para que las pruebas de días anteriores no se unan al evento con una recta.
+- En iPhone, el primer toque en Modo Encuentro pide la brújula, y ubicación y brújula no figuran en "Listo para usar sin señal": no se conservan al reabrir, así que marcarlas prometería algo falso.
 - La hora de cada posición es la del teléfono al recibirla, no `position.timestamp`: WebKit la informó en microsegundos, y eso rompía la antigüedad y el recorrido.

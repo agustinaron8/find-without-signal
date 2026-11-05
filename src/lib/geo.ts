@@ -204,6 +204,11 @@ export function currentTripStart<T extends { t: number }>(sortedPoints: T[]): T 
   return sortedPoints[0];
 }
 
+export function currentTrip<T extends { t: number }>(sortedPoints: T[]): T[] {
+  const start = currentTripStart(sortedPoints);
+  return start ? sortedPoints.slice(sortedPoints.indexOf(start)) : [];
+}
+
 export function nextPlanTime(times: string[], now: Date): { time: string; minutes: number } | null {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const upcoming = times

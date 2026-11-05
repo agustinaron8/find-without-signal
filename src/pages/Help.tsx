@@ -76,7 +76,7 @@ export default function Help() {
             <li>En iPhone, usá siempre la app instalada y no borres los datos de Safari ni la app antes de que termine el evento.</li>
             <li>Sin señal, el GPS puede tardar hasta un minuto en ubicarte la primera vez.</li>
             <li>
-              En iPhone, cada vez que abrís la app de nuevo vuelve a pedir la ubicación y hay que tocar "Activar brújula" en Modo Encuentro. Es una regla de Apple. Tus grupos,
+              En iPhone, cada vez que abrís la app de nuevo vuelve a pedir la ubicación y el primer toque en Modo Encuentro pide la brújula. Es una regla de Apple. Tus grupos,
               puntos y mapa no se pierden.
             </li>
             <li>La brújula se confunde cerca de metal e imanes. Alejá el teléfono de otros aparatos. Al caminar, la app te dice si te acercás o te alejás, sin usar la brújula: si no coinciden, hacele caso a eso.</li>
