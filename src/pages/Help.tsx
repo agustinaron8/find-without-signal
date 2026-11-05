@@ -87,6 +87,9 @@ export default function Help() {
             puede leerla y se borra a los 3 días.
           </p>
         </section>
+        <p data-testid="app-version" className="text-center text-sm text-slate-500">
+          Versión {__APP_VERSION__}
+        </p>
       </main>
     </>
   );

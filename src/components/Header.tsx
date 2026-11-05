@@ -10,7 +10,7 @@ interface HeaderProps {
 export default function Header({ title, backTo }: HeaderProps) {
   const online = useOnline();
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 bg-slate-950/95 px-4 py-3">
+    <header className="sticky top-0 z-10 flex items-center gap-3 bg-slate-950 px-4 py-3">
       {backTo && (
         <Link to={backTo} aria-label="Volver" className="-ml-2 p-2">
           <ArrowLeft size={24} />

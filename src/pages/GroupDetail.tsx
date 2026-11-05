@@ -7,7 +7,7 @@ import OfflineChecklist from '../components/OfflineChecklist';
 import OfflineMapCard from '../components/OfflineMapCard';
 import QRCode from '../components/QRCode';
 import { db, deleteGroup } from '../db';
-import { buildShareUrl } from '../lib/share';
+import { buildInvitation, buildShareUrl } from '../lib/share';
 
 export default function GroupDetail() {
   const { id = '' } = useParams();
@@ -37,10 +37,10 @@ export default function GroupDetail() {
   const shareLink = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: group.name, url: shareUrl });
+        await navigator.share({ title: group.name, text: buildInvitation(group, shareUrl) });
       } else {
-        await navigator.clipboard.writeText(shareUrl);
-        setShareStatus('Link copiado.');
+        await navigator.clipboard.writeText(buildInvitation(group, shareUrl));
+        setShareStatus('Invitación copiada, con el link y los pasos.');
       }
     } catch (err) {
       // Closing the system share sheet rejects with AbortError; that is not a failure.

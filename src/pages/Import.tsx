@@ -7,7 +7,8 @@ import QRScanner from '../components/QRScanner';
 import { db } from '../db';
 import { isIOSBrowser } from '../lib/platform';
 import { createJoinedMember, filterMembers, MAX_MEMBER_NAME, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
-import { decodeGroup, extractPayload, mergeImportedGroup, type SharedGroup } from '../lib/share';
+import { sharingKey } from '../lib/lastKnown';
+import { buildShareUrl, decodeGroup, extractPayload, mergeImportedGroup, type SharedGroup } from '../lib/share';
 
 const INVALID_MESSAGE = 'Ese código no es un grupo de Reencuentro válido.';
 
@@ -22,6 +23,9 @@ export default function Import() {
   const [memberFilter, setMemberFilter] = useState('');
   const [joinName, setJoinName] = useState('');
   const [joinPhone, setJoinPhone] = useState('');
+  const [shareLocation, setShareLocation] = useState(false);
+  const [stayInSafari, setStayInSafari] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const existing = useLiveQuery(() => (group ? db.groups.get(group.id) : undefined), [group?.id]);
 
   const load = (input: string): boolean => {
@@ -47,8 +51,17 @@ export default function Import() {
     if (existing?.myMemberId) setMyMemberId(existing.myMemberId);
   }, [existing?.myMemberId]);
 
+  const iosSafariGate = isIOSBrowser() && !stayInSafari;
+
+  const copyLink = async () => {
+    if (!group) return;
+    await navigator.clipboard.writeText(buildShareUrl({ ...group }));
+    setLinkCopied(true);
+  };
+
   const save = async () => {
     if (!group) return;
+    if (shareLocation) localStorage.setItem(sharingKey(group.id), '1');
     if (joinName.trim()) {
       const member = createJoinedMember(joinName, joinPhone);
       const merged = mergeImportedGroup(group, existing);
@@ -56,7 +69,7 @@ export default function Import() {
     } else {
       await db.groups.put(mergeImportedGroup(group, existing, myMemberId));
     }
-    navigate(`/group/${group.id}`, { replace: true });
+    navigate(`/group/${group.id}`, { replace: true, state: { autoDownloadMap: true } });
   };
 
   if (group) {
@@ -64,12 +77,6 @@ export default function Import() {
       <>
         <Header title="Importar grupo" backTo="/" />
         <main className="mx-auto max-w-md space-y-4 p-4">
-          {isIOSBrowser() && (
-            <p className="rounded-lg bg-amber-950 p-3 text-sm text-amber-100">
-              Estás en Safari. En iPhone, la app instalada guarda sus datos aparte: instalala primero y pegá este link
-              desde ahí.
-            </p>
-          )}
           <section className="rounded-xl bg-slate-900 p-4">
             <h2 className="text-2xl font-bold">{group.name}</h2>
             <p className="text-slate-300">
@@ -79,68 +86,104 @@ export default function Import() {
             {group.plan && <p className="mt-2 text-sm text-slate-300">{group.plan}</p>}
           </section>
 
-          {!(existing?.myMemberId && existing.members.some((m) => m.joined && m.id === existing.myMemberId)) && (
-            <section className="space-y-2 rounded-xl bg-slate-900 p-4">
-              <label htmlFor="join-name" className="block font-semibold">
-                {group.members.length > 0 ? 'Si no estás en la lista, escribí tu nombre' : 'Tu nombre y apellido'}
-              </label>
-              <input
-                id="join-name"
-                maxLength={MAX_MEMBER_NAME}
-                className="w-full rounded-lg bg-slate-800 p-3 text-base"
-                placeholder="Como te conocen en el grupo"
-                value={joinName}
-                onChange={(e) => {
-                  setJoinName(e.target.value);
-                  setMyMemberId(undefined);
-                }}
-              />
-              <input
-                aria-label="Tu teléfono"
-                type="tel"
-                className="w-full rounded-lg bg-slate-800 p-3 text-base"
-                placeholder="Tu teléfono (opcional, para SMS)"
-                value={joinPhone}
-                onChange={(e) => setJoinPhone(e.target.value)}
-              />
-            </section>
-          )}
-
-          {group.members.length > 0 && (
-            <fieldset className="space-y-1 rounded-xl bg-slate-900 p-4">
-              <legend className="float-left mb-2 font-semibold">¿Quién sos vos?</legend>
-              {group.members.length > MEMBER_FILTER_FROM && (
-                <input
-                  type="search"
-                  aria-label="Buscar mi nombre"
-                  placeholder="Buscá tu nombre"
-                  className="clear-both mb-2 block w-full rounded-lg bg-slate-800 p-3 text-base"
-                  value={memberFilter}
-                  onChange={(e) => setMemberFilter(e.target.value)}
-                />
-              )}
-              {sortMembers(filterMembers(group.members, memberFilter)).map((member) => (
-                <label key={member.id} className="clear-both flex items-center gap-3 py-2">
+          {iosSafariGate ? (
+            <>
+              <section className="space-y-3 rounded-xl bg-amber-950 p-4 text-amber-50">
+                <h2 className="text-lg font-bold">Falta un paso: instalar la app</h2>
+                <p className="text-sm">En iPhone, lo que guardes en Safari no aparece en la app instalada.</p>
+                <ol className="list-decimal space-y-2 pl-5">
+                  <li>
+                    <button type="button" className="rounded-lg bg-amber-200 px-3 py-2 font-semibold text-amber-950" onClick={copyLink}>
+                      {linkCopied ? 'Link copiado' : 'Copiar el link'}
+                    </button>
+                  </li>
+                  <li>Tocá Compartir, abajo en Safari, y elegí "Agregar a inicio".</li>
+                  <li>Abrí Reencuentro desde el ícono nuevo.</li>
+                  <li>Tocá Importar y pegá el link.</li>
+                </ol>
+              </section>
+              <button type="button" className="w-full p-3 text-sm text-slate-400 underline" onClick={() => setStayInSafari(true)}>
+                Seguir en Safari igual (no recomendado)
+              </button>
+            </>
+          ) : (
+            <>
+              {!(existing?.myMemberId && existing.members.some((m) => m.joined && m.id === existing.myMemberId)) && (
+                <section className="space-y-2 rounded-xl bg-slate-900 p-4">
+                  <label htmlFor="join-name" className="block font-semibold">
+                    {group.members.length > 0 ? 'Si no estás en la lista, escribí tu nombre' : 'Tu nombre y apellido'}
+                  </label>
                   <input
-                    type="radio"
-                    name="import-member"
-                    checked={myMemberId === member.id}
-                    onChange={() => {
-                      setMyMemberId(member.id);
-                      setJoinName('');
+                    id="join-name"
+                    maxLength={MAX_MEMBER_NAME}
+                    className="w-full rounded-lg bg-slate-800 p-3 text-base"
+                    placeholder="Como te conocen en el grupo"
+                    value={joinName}
+                    onChange={(e) => {
+                      setJoinName(e.target.value);
+                      setMyMemberId(undefined);
                     }}
                   />
-                  <span className="h-3 w-3 rounded-full" style={{ background: member.color }} />
-                  {member.name}
-                </label>
-              ))}
-            </fieldset>
-          )}
+                  <input
+                    aria-label="Tu teléfono"
+                    type="tel"
+                    className="w-full rounded-lg bg-slate-800 p-3 text-base"
+                    placeholder="Tu teléfono (opcional, para SMS)"
+                    value={joinPhone}
+                    onChange={(e) => setJoinPhone(e.target.value)}
+                  />
+                </section>
+              )}
 
-          {existing && <p className="text-sm text-amber-200">Ya tenés este grupo. Se actualizará con estos datos.</p>}
-          <button type="button" className="w-full rounded-xl bg-sky-400 p-4 font-semibold text-slate-950" onClick={save}>
-            {existing ? 'Actualizar' : 'Guardar grupo'}
-          </button>
+              {group.members.length > 0 && (
+                <fieldset className="space-y-1 rounded-xl bg-slate-900 p-4">
+                  <legend className="float-left mb-2 font-semibold">¿Quién sos vos?</legend>
+                  {group.members.length > MEMBER_FILTER_FROM && (
+                    <input
+                      type="search"
+                      aria-label="Buscar mi nombre"
+                      placeholder="Buscá tu nombre"
+                      className="clear-both mb-2 block w-full rounded-lg bg-slate-800 p-3 text-base"
+                      value={memberFilter}
+                      onChange={(e) => setMemberFilter(e.target.value)}
+                    />
+                  )}
+                  {sortMembers(filterMembers(group.members, memberFilter)).map((member) => (
+                    <label key={member.id} className="clear-both flex items-center gap-3 py-2">
+                      <input
+                        type="radio"
+                        name="import-member"
+                        checked={myMemberId === member.id}
+                        onChange={() => {
+                          setMyMemberId(member.id);
+                          setJoinName('');
+                        }}
+                      />
+                      <span className="h-3 w-3 rounded-full" style={{ background: member.color }} />
+                      {member.name}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+
+              {(joinName.trim() || myMemberId) && (
+                <label className="flex items-start gap-3 rounded-xl bg-slate-900 p-4">
+                  <input type="checkbox" className="mt-1 h-5 w-5" checked={shareLocation} onChange={(e) => setShareLocation(e.target.checked)} />
+                  <span>
+                    <span className="block font-semibold">Compartir mi ubicación con el grupo</span>
+                    <span className="block text-sm text-slate-400">
+                      Para que te encuentren, si hay algo de red y con el Modo Encuentro abierto. Va cifrada y se puede apagar cuando quieras.
+                    </span>
+                  </span>
+                </label>
+              )}
+
+              {existing && <p className="text-sm text-amber-200">Ya tenés este grupo. Se actualizará con estos datos.</p>}
+              <button type="button" className="w-full rounded-xl bg-sky-400 p-4 font-semibold text-slate-950" onClick={save}>
+                {existing ? 'Actualizar' : 'Guardar grupo'}
+              </button>
+            </>
+          )}
         </main>
       </>
     );

@@ -3,7 +3,7 @@ import { compressToEncodedURIComponent } from 'lz-string';
 import QRCode from 'qrcode';
 import { describe, expect, it } from 'vitest';
 import type { Group } from '../src/db';
-import { buildShareUrl, decodeGroup, encodeGroup, extractPayload, MAX_MEMBERS, mergeImportedGroup } from '../src/lib/share';
+import { buildInvitation, buildShareUrl, decodeGroup, encodeGroup, extractPayload, MAX_MEMBERS, mergeImportedGroup } from '../src/lib/share';
 
 const group: Group = {
   id: 'g1',
@@ -41,6 +41,7 @@ describe('payload', () => {
     expect(url.startsWith('https://x.app/i#')).toBe(true);
     expect(decodeGroup(extractPayload(`  ${url} `))?.id).toBe('g1');
     expect(extractPayload('abc')).toBe('abc');
+    expect(decodeGroup(extractPayload(buildInvitation({ ...group, name: 'Grupo #1' }, url)))?.id).toBe('g1');
   });
 
   it.each([

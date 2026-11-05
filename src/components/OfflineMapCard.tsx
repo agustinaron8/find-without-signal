@@ -1,7 +1,9 @@
 import { CheckCircle2, Download, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { db, type Group } from '../db';
 import { useOnline } from '../hooks/useOnline';
+import { isIOSBrowser } from '../lib/platform';
 import {
   areaCoversPoints,
   DEFAULT_MARGIN_KM,
@@ -16,6 +18,8 @@ const formatMB = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1).replace(
 
 export default function OfflineMapCard({ group }: { group: Group }) {
   const online = useOnline();
+  const autoStart = (useLocation().state as { autoDownloadMap?: boolean } | null)?.autoDownloadMap === true;
+  const autoStarted = useRef(false);
   const [marginKm, setMarginKm] = useState(DEFAULT_MARGIN_KM);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [message, setMessage] = useState('');
@@ -66,6 +70,14 @@ export default function OfflineMapCard({ group }: { group: Group }) {
       abortRef.current = null;
     }
   };
+
+  // Whoever just joined should not have to remember this; Safari on iPhone is excluded because that data stays behind.
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || !online || coversPoints || isIOSBrowser()) return;
+    autoStarted.current = true;
+    start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, online, coversPoints]);
 
   return (
     <section className="space-y-3 rounded-xl bg-slate-900 p-4">

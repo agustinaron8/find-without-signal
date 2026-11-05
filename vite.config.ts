@@ -1,9 +1,21 @@
 /// <reference types="vitest/config" />
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+function appVersion(): string {
+  const fromVercel = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (fromVercel) return fromVercel.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short=7 HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+}
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(appVersion()) },
   plugins: [
     react(),
     VitePWA({

@@ -22,5 +22,7 @@
 - Con más de 12 personas ubicadas, el mapa muestra solo los puntos y a la persona elegida como destino: si no, las etiquetas tapan los puntos de encuentro.
 - Lista de personas pegada: una por línea, con teléfono opcional. Con más de 12 personas, el editor las pliega detrás de un buscador para no alejar los puntos de encuentro.
 - Unirse por link: cada persona escribe su nombre y queda marcada como `joined`, fuera de la lista que comparte su teléfono. Los demás la conocen por el nombre que viaja cifrado con su ubicación. Con esto el link queda chico y el QR entra aunque sean 100 personas.
+- Al compartir se manda una invitación con los pasos, no solo el link, y el importador acepta el mensaje entero. En Safari de iPhone, el importador muestra primero cómo instalar.
+- Al unirse, el mapa empieza a bajarse solo (salvo en Safari de iPhone). Compartir la ubicación se ofrece al unirse, pero sigue apagado por defecto.
 - `/api/loc` no tiene rate limit: un abuso solo agotaría la cuota de la base, y eso apaga esta función sin afectar puntos, flecha ni mapa.
 - La hora de cada posición es la del teléfono al recibirla, no `position.timestamp`: WebKit la informó en microsegundos, y eso rompía la antigüedad y el recorrido.

@@ -26,6 +26,8 @@ const fromBase64Url = (value: string) =>
 const sha256 = async (value: string) =>
   new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)));
 
+export const sharingKey = (groupId: string) => `share-location-${groupId}`;
+
 export interface LocationKeys {
   channel: string;
   key: CryptoKey;

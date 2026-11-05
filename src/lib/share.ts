@@ -32,6 +32,17 @@ export function buildShareUrl(group: Group, origin = window.location.origin): st
   return `${origin}/i#${encodeGroup(group)}`;
 }
 
+// Most mistakes happen here: on iPhone a tapped link opens Safari, whose data the installed app cannot see.
+export function buildInvitation(group: Group, url = buildShareUrl(group)): string {
+  return [
+    `Sumate a "${group.name}" en Reencuentro, para encontrarnos aunque no haya señal.`,
+    'iPhone: abrí el link en Safari, seguí los pasos para instalar la app y, desde la app, tocá Importar y pegá este mensaje.',
+    'Android: abrí el link en Chrome, instalá la app y unite.',
+    'Hacelo con señal y antes de salir.',
+    url,
+  ].join('\n\n');
+}
+
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.slice(0, MAX_TEXT) : undefined;
 
@@ -87,8 +98,11 @@ export function decodeGroup(payload: string): SharedGroup | null {
   };
 }
 
+// People paste the whole invitation, not just the link, and a group name may contain a "#".
 export function extractPayload(input: string): string {
   const trimmed = input.trim();
+  const links = [...trimmed.matchAll(/\/i#(\S+)/g)];
+  if (links.length > 0) return links[links.length - 1][1];
   const hash = trimmed.indexOf('#');
   return hash === -1 ? trimmed : trimmed.slice(hash + 1);
 }

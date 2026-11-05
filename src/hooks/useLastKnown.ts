@@ -10,6 +10,7 @@ import {
   memberTag,
   newestLocations,
   nextSyncDelay,
+  sharingKey,
   type SyncWrite,
 } from '../lib/lastKnown';
 import type { Position } from './useGeolocation';
@@ -17,8 +18,6 @@ import type { Position } from './useGeolocation';
 // A worse fix would send people to the wrong side of the grounds.
 const MAX_SHARED_ACCURACY_M = 200;
 const OFF_PENDING = 'off';
-
-const sharingKey = (groupId: string) => `share-location-${groupId}`;
 
 export function useLastKnown(group: Group | null | undefined, position: Position | null) {
   const groupId = group?.id;
