@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Bookmark, ClipboardPaste, Compass as CompassIcon, Map as MapIcon, MessageSquare, Undo2 } from 'lucide-react';
+import { ArrowLeft, Bookmark, ClipboardPaste, Compass as CompassIcon, Flashlight, Map as MapIcon, MessageSquare, Undo2 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Compass from '../components/Compass';
 import type { MapPoint } from '../components/MapView';
+import SignalScreen from '../components/SignalScreen';
 import SmsDialog from '../components/SmsDialog';
 import { db, type TrackPoint } from '../db';
 import { useGeolocation } from '../hooks/useGeolocation';
@@ -31,9 +32,9 @@ const GPS_HEADING_MIN_SPEED_MS = 0.5;
 // A trip older than this is a previous outing, not the way back from today's.
 const TRACK_SESSION_MS = 12 * 60 * 60 * 1000;
 
-const buttonBase = 'flex items-center justify-center gap-2 rounded-xl p-3 font-semibold';
+const buttonBase = 'flex items-center justify-center gap-2 rounded-xl p-2 font-semibold';
 const bigButton = `${buttonBase} bg-slate-200 text-slate-950`;
-const primaryButton = `${buttonBase} bg-slate-950 text-lg text-white`;
+const primaryButton = `${buttonBase} bg-slate-950 py-3 text-white`;
 
 export default function Meet() {
   const { id = '' } = useParams();
@@ -52,7 +53,7 @@ export default function Meet() {
   // Persisted because opening the SMS app can make iOS reload this page.
   const [destinationId, setDestinationId] = useState<string | null>(() => localStorage.getItem(storageKey));
   const [view, setView] = useState<'radar' | 'map'>('radar');
-  const [sheet, setSheet] = useState<'sms' | 'paste' | 'save' | null>(null);
+  const [sheet, setSheet] = useState<'sms' | 'paste' | 'save' | 'signal' | null>(null);
   const [draftName, setDraftName] = useState('');
   const [pasted, setPasted] = useState('');
   const [sheetError, setSheetError] = useState('');
@@ -155,7 +156,7 @@ export default function Meet() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-white text-slate-950" style={{ minHeight: '100dvh' }}>
+    <div className="flex min-h-screen flex-col bg-white text-slate-950" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom))' }}>
       <header className="flex items-center gap-2 p-3">
         <Link to={`/group/${id}`} aria-label="Volver" className="p-2">
           <ArrowLeft size={28} />
@@ -172,6 +173,9 @@ export default function Meet() {
             </option>
           ))}
         </select>
+        <button type="button" aria-label="Hacerme ver" className="p-2" onClick={() => setSheet('signal')}>
+          <Flashlight size={28} />
+        </button>
       </header>
 
       {(group.plan || plan) && (
@@ -229,7 +233,7 @@ export default function Meet() {
           )}
 
           {distance !== null && (
-            <p data-testid="distance" className="text-7xl font-black tracking-tight">
+            <p data-testid="distance" className="text-6xl font-black tracking-tight">
               {poorFix && '≈ '}
               {formatDistance(distance)}
             </p>
@@ -265,7 +269,7 @@ export default function Meet() {
         </main>
       )}
 
-      <nav className="grid grid-cols-2 gap-2 p-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+      <nav className="grid grid-cols-2 gap-2 p-3">
         <button type="button" className={`${primaryButton} col-span-2`} onClick={() => openSheet('sms')}>
           <MessageSquare size={22} /> Mandar mi ubicación por SMS
         </button>
@@ -288,6 +292,8 @@ export default function Meet() {
           <Undo2 size={20} /> Volver por donde vine
         </button>
       </nav>
+
+      {sheet === 'signal' && <SignalScreen onClose={() => setSheet(null)} />}
 
       {sheet === 'sms' && <SmsDialog members={group.members.filter((m) => m.id !== group.myMemberId)} position={position} onClose={() => setSheet(null)} />}
 

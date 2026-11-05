@@ -109,7 +109,7 @@ export default function MapView({ points, overlay, draggable, onTap, onDragPoint
   const overlayRef = useRef(overlay);
   const loadedRef = useRef(false);
   const framedRef = useRef(false);
-  const [failed, setFailed] = useState(false);
+  const [problem, setProblem] = useState<'no-map' | 'missing-tiles' | null>(null);
 
   useEffect(() => {
     callbacksRef.current = { onTap, onDragPoint };
@@ -144,12 +144,12 @@ export default function MapView({ points, overlay, draggable, onTap, onDragPoint
     });
     map.on('load', () => {
       loadedRef.current = true;
-      setFailed(false);
+      setProblem((current) => (current === 'no-map' ? null : current));
       if (overlayRef.current) applyOverlay(map, overlayRef.current);
     });
     map.on('error', (e: { sourceId?: string; tile?: unknown }) => {
-      // A missing tile only leaves a blank patch; a missing style or tileset means no map at all.
-      if (!styleLoaded || (e.sourceId && !e.tile)) setFailed(true);
+      if (!styleLoaded || (e.sourceId && !e.tile)) setProblem('no-map');
+      else if (e.tile) setProblem((current) => current ?? 'missing-tiles');
     });
 
     return () => {
@@ -217,9 +217,11 @@ export default function MapView({ points, overlay, draggable, onTap, onDragPoint
     <div className={`relative overflow-hidden rounded-xl bg-slate-900 ${className ?? ''}`}>
       {/* Inline because MapLibre's stylesheet forces `position: relative` over any class. */}
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
-      {failed && (
+      {problem && (
         <p className="absolute inset-x-3 top-3 rounded-lg bg-slate-950/90 p-3 text-sm text-amber-200">
-          No se pudo cargar el mapa. Sin señal solo se ve si descargaste la zona antes.
+          {problem === 'no-map'
+            ? 'No se pudo cargar el mapa. Sin señal solo se ve si bajaste la zona antes. La brújula funciona igual.'
+            : 'Falta el mapa de esta zona. Sin señal solo se ve lo que bajaste antes. La brújula funciona igual.'}
         </p>
       )}
     </div>

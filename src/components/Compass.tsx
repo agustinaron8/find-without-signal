@@ -15,7 +15,7 @@ export default function Compass({ rotation }: { rotation: number }) {
       style={{ transform: `rotate(${accumulated.current}deg)` }}
     >
       {/* The icon's own artwork points to the upper right, 45° off from north. */}
-      <Navigation size={208} strokeWidth={1.5} className="-rotate-45 fill-slate-950 text-slate-950" />
+      <Navigation strokeWidth={1.5} className="h-auto w-[min(56vw,23dvh)] -rotate-45 fill-slate-950 text-slate-950" />
     </div>
   );
 }
