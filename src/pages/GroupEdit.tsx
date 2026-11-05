@@ -1,10 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { LocateFixed, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { db, type Group, type MeetingPoint, type Member } from '../db';
 import { parseCoords } from '../lib/geo';
+
+const MapView = lazy(() => import('../components/MapView'));
 
 const MEMBER_COLORS = ['#38bdf8', '#fbbf24', '#f472b6', '#34d399', '#a78bfa', '#fb923c', '#f87171', '#a3e635'];
 const MAX_POINTS = 5;
@@ -109,7 +111,7 @@ export default function GroupEdit() {
   return (
     <>
       <Header title={id ? 'Editar grupo' : 'Nuevo grupo'} backTo={id ? `/group/${id}` : '/'} />
-      <main className="mx-auto max-w-md space-y-6 p-4 pb-28">
+      <main className="mx-auto max-w-md space-y-6 p-4 pb-44">
         <section>
           <label htmlFor="group-name" className="mb-1 block font-semibold">
             Nombre del grupo
@@ -179,6 +181,16 @@ export default function GroupEdit() {
 
         <section className="space-y-2">
           <h2 className="font-semibold">Puntos de encuentro</h2>
+          <p className="text-sm text-slate-400">Tocá el mapa para marcar un punto. Arrastralo para ajustarlo.</p>
+          <Suspense fallback={<div className="h-64 rounded-xl bg-slate-900" />}>
+            <MapView
+              className="h-64"
+              draggable
+              points={group.meetingPoints}
+              onTap={addPoint}
+              onDragPoint={(pointId, lat, lng) => patchPoint(pointId, { lat, lng })}
+            />
+          </Suspense>
           {group.meetingPoints.map((point) => (
             <div key={point.id} className="space-y-2 rounded-xl bg-slate-900 p-3">
               <div className="flex items-center gap-2">
@@ -269,16 +281,15 @@ export default function GroupEdit() {
           />
         </section>
 
-        {error && (
-          <p role="alert" className="rounded-lg bg-red-950 p-3 text-red-200">
-            {error}
-          </p>
-        )}
-
         <div
           className="fixed inset-x-0 bottom-0 bg-slate-950 p-4"
           style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
         >
+          {error && (
+            <p role="alert" className="mx-auto mb-2 max-w-md rounded-lg bg-red-950 p-3 text-red-200">
+              {error}
+            </p>
+          )}
           <button type="button" className="mx-auto block w-full max-w-md rounded-xl bg-sky-400 p-4 font-semibold text-slate-950" onClick={save}>
             Guardar grupo
           </button>
