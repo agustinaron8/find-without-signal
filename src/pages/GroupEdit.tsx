@@ -5,12 +5,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { db, type Group, type MeetingPoint, type Member } from '../db';
 import { parseCoords } from '../lib/geo';
-import { filterMembers, MEMBER_FILTER_FROM, parseMemberList } from '../lib/members';
+import { filterMembers, MEMBER_COLORS, MEMBER_FILTER_FROM, parseMemberList } from '../lib/members';
 import { MAX_MEMBERS } from '../lib/share';
 
 const MapView = lazy(() => import('../components/MapView'));
 
-const MEMBER_COLORS = ['#38bdf8', '#fbbf24', '#f472b6', '#34d399', '#a78bfa', '#fb923c', '#f87171', '#a3e635'];
 const MAX_POINTS = 5;
 const PLAN_TIME = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
@@ -159,6 +158,7 @@ export default function GroupEdit() {
 
         <section className="space-y-2">
           <h2 className="font-semibold">Personas{group.members.length > 0 && ` (${group.members.length})`}</h2>
+          <p className="text-sm text-slate-400">Opcional. Si no cargás a nadie, cada uno escribe su nombre al entrar por el link o el QR.</p>
           {longList && (
             <input
               type="search"

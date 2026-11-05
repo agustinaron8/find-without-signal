@@ -1,3 +1,5 @@
+import type { Member, MemberLocation } from '../db';
+
 export const MEMBER_FILTER_FROM = 12;
 
 const normalize = (text: string) =>
@@ -70,4 +72,28 @@ export function parseMemberList(text: string, existing: ParsedMember[] = []): Pa
     }
   }
   return { members, unreadable, duplicates };
+}
+
+export const MEMBER_COLORS = ['#38bdf8', '#fbbf24', '#f472b6', '#34d399', '#a78bfa', '#fb923c', '#f87171', '#a3e635'];
+export const MAX_MEMBER_NAME = 40;
+
+export function createJoinedMember(name: string, phone = ''): Member {
+  const id = crypto.randomUUID();
+  const color = MEMBER_COLORS[parseInt(id.slice(0, 2), 16) % MEMBER_COLORS.length];
+  return { id, name: name.trim().slice(0, MAX_MEMBER_NAME), color, joined: true, ...(phone.trim() ? { phone: phone.trim() } : {}) };
+}
+
+// Whoever joined by link is not in the shared list: they are known by the location they send.
+export function groupRoster(members: Member[], locations: MemberLocation[], me?: string): Member[] {
+  const roster = new Map<string, Member>();
+  members.filter((m) => m.id !== me).forEach((m) => roster.set(m.id, m));
+  locations.forEach((l) => {
+    const known = roster.get(l.memberId);
+    if (known) {
+      if (!known.phone && l.phone) roster.set(l.memberId, { ...known, phone: l.phone });
+    } else if (l.memberId !== me && l.name) {
+      roster.set(l.memberId, { id: l.memberId, name: l.name, color: l.color ?? MEMBER_COLORS[0], phone: l.phone });
+    }
+  });
+  return [...roster.values()];
 }

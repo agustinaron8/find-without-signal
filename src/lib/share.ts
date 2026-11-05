@@ -19,7 +19,7 @@ export function encodeGroup(group: Group): string {
     id: group.id,
     name: group.name,
     createdAt: group.createdAt,
-    members: group.members,
+    members: group.members.filter((m) => !m.joined),
     meetingPoints: group.meetingPoints,
     plan: group.plan,
     planTimes: group.planTimes,
@@ -95,9 +95,12 @@ export function extractPayload(input: string): string {
 
 // An update must keep this phone's own data: the downloaded map and who "I" am.
 export function mergeImportedGroup(imported: SharedGroup, existing: Group | undefined, myMemberId?: string): Group {
+  const joined = (existing?.members ?? []).filter((m) => m.joined && !imported.members.some((i) => i.id === m.id));
+  const members = [...imported.members, ...joined];
   return {
     ...imported,
+    members,
     offlineArea: existing?.offlineArea,
-    myMemberId: imported.members.some((m) => m.id === myMemberId) ? myMemberId : undefined,
+    myMemberId: members.some((m) => m.id === myMemberId) ? myMemberId : undefined,
   };
 }

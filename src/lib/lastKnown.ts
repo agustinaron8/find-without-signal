@@ -1,4 +1,5 @@
 import type { MemberLocation } from '../db';
+import { MAX_MEMBER_NAME } from './members';
 
 export const LOCATION_ENDPOINT = '/api/loc';
 export const LOCATION_MAX_AGE_MS = 72 * 60 * 60 * 1000;
@@ -11,6 +12,8 @@ const REQUEST_TIMEOUT_MS = 15 * 1000;
 const MAX_ENTRIES = 150;
 const IV_BYTES = 12;
 const CLOCK_SKEW_MS = 60 * 60 * 1000;
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const PHONE = /^[+\d\s().-]{7,25}$/;
 
 const encoder = new TextEncoder();
 
@@ -47,11 +50,14 @@ export interface LocationFix {
   lng: number;
   acc: number;
   t: number;
+  name?: string;
+  color?: string;
+  phone?: string;
 }
 
 export async function encryptLocation(key: CryptoKey, fix: LocationFix): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const plain = encoder.encode(JSON.stringify({ i: fix.memberId, a: fix.lat, o: fix.lng, c: Math.round(fix.acc), t: fix.t }));
+  const plain = encoder.encode(JSON.stringify({ i: fix.memberId, a: fix.lat, o: fix.lng, c: Math.round(fix.acc), t: fix.t, n: fix.name, k: fix.color, p: fix.phone }));
   const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
   const out = new Uint8Array(IV_BYTES + cipher.length);
   out.set(iv);
@@ -70,7 +76,16 @@ export async function decryptLocation(key: CryptoKey, data: string, now = Date.n
     const raw = JSON.parse(new TextDecoder().decode(plain));
     if (typeof raw?.i !== 'string' || !finite(raw.a, 90) || !finite(raw.o, 180) || !finite(raw.c, 1e7)) return null;
     if (!finite(raw.t, Number.MAX_SAFE_INTEGER) || raw.t > now + CLOCK_SKEW_MS) return null;
-    return { memberId: raw.i, lat: raw.a, lng: raw.o, acc: raw.c, t: raw.t };
+    return {
+      memberId: raw.i,
+      lat: raw.a,
+      lng: raw.o,
+      acc: raw.c,
+      t: raw.t,
+      ...(typeof raw.n === 'string' && raw.n.trim() ? { name: raw.n.trim().slice(0, MAX_MEMBER_NAME) } : {}),
+      ...(typeof raw.k === 'string' && HEX_COLOR.test(raw.k) ? { color: raw.k } : {}),
+      ...(typeof raw.p === 'string' && PHONE.test(raw.p) ? { phone: raw.p } : {}),
+    };
   } catch {
     return null;
   }
@@ -112,14 +127,14 @@ export function newestLocations(
   groupId: string,
   fixes: LocationFix[],
   stored: MemberLocation[],
-  allowedMembers: Set<string>,
+  me?: string,
 ): MemberLocation[] {
   const newest = new Map(stored.map((s) => [s.memberId, s.t]));
   const updates = new Map<string, MemberLocation>();
-  for (const { memberId, lat, lng, acc, t } of fixes) {
-    if (!allowedMembers.has(memberId) || t <= (newest.get(memberId) ?? 0)) continue;
-    newest.set(memberId, t);
-    updates.set(memberId, { groupId, memberId, lat, lng, acc, t });
+  for (const fix of fixes) {
+    if (fix.memberId === me || fix.t <= (newest.get(fix.memberId) ?? 0)) continue;
+    newest.set(fix.memberId, fix.t);
+    updates.set(fix.memberId, { groupId, ...fix });
   }
   return [...updates.values()];
 }

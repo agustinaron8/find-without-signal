@@ -1,13 +1,15 @@
 import { Moon, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { db, type Group, type MemberLocation } from '../db';
+import { type Group, type Member, type MemberLocation } from '../db';
 import type { Position } from '../hooks/useGeolocation';
+import IdentityForm from './IdentityForm';
 import { formatDistance, haversine } from '../lib/geo';
 import { formatAge, LOCATION_STALE_MS } from '../lib/lastKnown';
 import { filterMembers, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 interface Props {
   group: Group;
+  roster: Member[];
   locations: MemberLocation[];
   position: Position | null;
   sharing: boolean;
@@ -25,6 +27,7 @@ interface Props {
 
 export default function GroupLocationsSheet({
   group,
+  roster,
   locations,
   position,
   sharing,
@@ -40,7 +43,7 @@ export default function GroupLocationsSheet({
   now,
 }: Props) {
   const [filter, setFilter] = useState('');
-  const others = group.members.filter((m) => m.id !== group.myMemberId);
+  const others = roster;
   const lastSeen = new Map(locations.map((l) => [l.memberId, l.t]));
   // Whoever has a location comes first, newest on top: that is who can actually be found.
   const visible = sortMembers(filterMembers(others, filter)).sort((a, b) => (lastSeen.get(b.id) ?? 0) - (lastSeen.get(a.id) ?? 0));
@@ -73,19 +76,8 @@ export default function GroupLocationsSheet({
         ) : (
           <div className="rounded-xl border-2 border-slate-950 p-3">
             <p className="font-bold">¿Quién sos en este grupo?</p>
-            <p className="mb-2 text-sm text-slate-700">Elegilo para poder compartir tu ubicación.</p>
-            <div className="flex flex-wrap gap-2">
-              {group.members.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="rounded-lg bg-slate-200 px-3 py-2 font-semibold"
-                  onClick={() => db.groups.update(group.id, { myMemberId: member.id })}
-                >
-                  {member.name}
-                </button>
-              ))}
-            </div>
+            <p className="text-sm text-slate-700">Decilo para poder compartir tu ubicación.</p>
+            <IdentityForm group={group} />
           </div>
         )}
 
@@ -144,7 +136,7 @@ export default function GroupLocationsSheet({
             );
           })}
         </ul>
-        {others.length === 0 && <p className="text-slate-700">No hay otras personas cargadas en este grupo.</p>}
+        {others.length === 0 && <p className="text-slate-700">Todavía nadie compartió su ubicación en este grupo.</p>}
 
         <p role="status" className="min-h-5 text-sm text-slate-700">
           {status}

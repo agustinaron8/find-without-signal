@@ -21,5 +21,6 @@
 - Tope de 100 personas por grupo. Sobre unas 35-40 el QR no entra: el grupo se comparte por link, antes del evento y con señal.
 - Con más de 12 personas ubicadas, el mapa muestra solo los puntos y a la persona elegida como destino: si no, las etiquetas tapan los puntos de encuentro.
 - Lista de personas pegada: una por línea, con teléfono opcional. Con más de 12 personas, el editor las pliega detrás de un buscador para no alejar los puntos de encuentro.
+- Unirse por link: cada persona escribe su nombre y queda marcada como `joined`, fuera de la lista que comparte su teléfono. Los demás la conocen por el nombre que viaja cifrado con su ubicación. Con esto el link queda chico y el QR entra aunque sean 100 personas.
 - `/api/loc` no tiene rate limit: un abuso solo agotaría la cuota de la base, y eso apaga esta función sin afectar puntos, flecha ni mapa.
 - La hora de cada posición es la del teléfono al recibirla, no `position.timestamp`: WebKit la informó en microsegundos, y eso rompía la antigüedad y el recorrido.

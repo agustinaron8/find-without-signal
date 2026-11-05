@@ -82,6 +82,25 @@ describe('mergeImportedGroup', () => {
     expect(merged.myMemberId).toBe('m2');
   });
 
+  it('keeps who joined by link when the group is updated', () => {
+    const me = { id: 'me', name: 'Sumada', color: '#38bdf8', joined: true };
+    const merged = mergeImportedGroup(imported, { ...group, members: [...group.members, me] }, 'me');
+    expect(merged.myMemberId).toBe('me');
+    expect(merged.members.map((m) => m.id)).toEqual(['m1', 'm2', 'me']);
+  });
+
+  it('leaves who joined by link out of the shared payload', () => {
+    const me = { id: 'me', name: 'Sumada', color: '#38bdf8', joined: true };
+    const shared = decodeGroup(encodeGroup({ ...group, members: [...group.members, me] }));
+    expect(shared?.members.map((m) => m.id)).toEqual(['m1', 'm2']);
+  });
+
+  it('accepts a group with nobody listed, for joining by link', () => {
+    const shared = decodeGroup(encodeGroup({ ...group, members: [] }));
+    expect(shared?.members).toEqual([]);
+    expect(mergeImportedGroup(shared!, undefined, undefined).members).toEqual([]);
+  });
+
   it('ignores an identity that is not in the group', () => {
     expect(mergeImportedGroup(imported, undefined, 'ghost').myMemberId).toBeUndefined();
   });

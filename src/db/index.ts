@@ -5,6 +5,8 @@ export interface Member {
   name: string;
   color: string;
   phone?: string;
+  // Added themselves from a link, so they stay out of the list this phone shares.
+  joined?: boolean;
 }
 
 export interface MeetingPoint {
@@ -63,6 +65,9 @@ export interface MemberLocation {
   lng: number;
   acc: number;
   t: number;
+  name?: string;
+  color?: string;
+  phone?: string;
 }
 
 class ReencuentroDB extends Dexie {

@@ -25,6 +25,8 @@ Red saturada simulada con un proxy que cuelga, demora y corta conexiones, sobre 
 
 Grupo de 100 personas: importar por link, buscar el nombre, lista, mapa y SMS. Sobre unas 35-40 personas el QR no entra y hay que compartir por link.
 
+Unirse por link: grupo sin lista, cada persona escribe su nombre y se ven entre sí al compartir.
+
 ## No probado todavía
 - Modo bolsillo en teléfonos reales: que la pantalla no se apague y cuánta batería gasta.
 - Última ubicación conocida en una red saturada real.

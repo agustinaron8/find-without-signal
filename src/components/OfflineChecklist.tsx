@@ -2,6 +2,7 @@ import { CheckCircle2, TriangleAlert } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Group } from '../db';
+import IdentityForm from './IdentityForm';
 import { useHeading } from '../hooks/useHeading';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 import { isIOSBrowser, isStandalone } from '../lib/platform';
@@ -102,10 +103,8 @@ export default function OfflineChecklist({ group }: { group: Group }) {
             </button>
           )}
         </Item>
-        <Item ok={!!group.myMemberId} label="Elegiste quién sos">
-          <Link to={`/group/${group.id}/edit`} className={actionClass}>
-            Elegir en el grupo
-          </Link>
+        <Item ok={!!group.myMemberId} label="Dijiste quién sos">
+          <IdentityForm group={group} dark />
         </Item>
       </ul>
 

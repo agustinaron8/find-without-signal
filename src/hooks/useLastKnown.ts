@@ -49,10 +49,10 @@ export function useLastKnown(group: Group | null | undefined, position: Position
 
     const locationWrite = async (channel: string, key: CryptoKey): Promise<SyncWrite | undefined> => {
       const { group: current, position: fix, sharing: isSharing } = latest.current;
-      const me = current?.myMemberId;
+      const me = current?.members.find((m) => m.id === current.myMemberId);
       if (!me || !isSharing || !fix || fix.accuracy > MAX_SHARED_ACCURACY_M) return undefined;
-      const d = await encryptLocation(key, { memberId: me, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t });
-      return { m: await memberTag(channel, me), d };
+      const d = await encryptLocation(key, { memberId: me.id, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t, name: me.name, color: me.color, phone: me.phone });
+      return { m: await memberTag(channel, me.id), d };
     };
 
     const exchange = async () => {
@@ -71,9 +71,8 @@ export function useLastKnown(group: Group | null | undefined, position: Position
       if (pendingOff && write?.d === null) localStorage.removeItem(sharingKey(groupId));
 
       const fixes = (await Promise.all(entries.map((data) => decryptLocation(key, data)))).filter((f) => f !== null);
-      const allowed = new Set(current.members.filter((m) => m.id !== me).map((m) => m.id));
       const existing = await db.memberLocations.where('groupId').equals(groupId).toArray();
-      const updates = newestLocations(groupId, fixes, existing, allowed);
+      const updates = newestLocations(groupId, fixes, existing, me);
       if (updates.length) await db.memberLocations.bulkPut(updates);
     };
 
@@ -159,7 +158,7 @@ export function useLastKnown(group: Group | null | undefined, position: Position
   const syncNow = useCallback(() => runRef.current(), []);
 
   const locations = (stored ?? []).filter(
-    (l) => l.memberId !== group?.myMemberId && Date.now() - l.t < LOCATION_MAX_AGE_MS && group?.members.some((m) => m.id === l.memberId),
+    (l) => l.memberId !== group?.myMemberId && Date.now() - l.t < LOCATION_MAX_AGE_MS && (!!l.name || group?.members.some((m) => m.id === l.memberId)),
   );
 
   return { locations, sharing, setSharing, lastSync, failing, syncing, syncNow };

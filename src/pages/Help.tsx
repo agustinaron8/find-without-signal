@@ -57,6 +57,10 @@ export default function Help() {
         <section className={card}>
           <h2 className="text-lg font-bold">Consejos para un evento con mucha gente</h2>
           <ul className="list-disc space-y-1 pl-5">
+            <li>
+              Para grupos grandes, armá el grupo solo con los puntos y el plan, y pasá el link o el QR: cada uno escribe su nombre al
+              entrar. El QR se puede leer las veces que haga falta, incluso impreso.
+            </li>
             <li>Prepará todo en casa con WiFi, el día anterior. En el lugar puede no haber red para nada.</li>
             <li>Acordá el punto y los horarios antes de separarse. Es lo único que funciona seguro.</li>
             <li>Elegí puntos fáciles de reconocer y, si podés, en el borde del predio: el centro va a ser intransitable.</li>

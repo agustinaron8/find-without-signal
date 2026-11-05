@@ -40,6 +40,22 @@ describe('location crypto', () => {
     expect(await encryptLocation(key, fix)).not.toBe(await encryptLocation(key, fix));
   });
 
+  it('carries who sent it, and drops malformed identity fields', async () => {
+    const { key } = await deriveLocationKeys(GROUP);
+    const full = { ...fix, name: 'Ana Gómez', color: '#38bdf8', phone: '+54 351 123-4567' };
+    expect(await decryptLocation(key, await encryptLocation(key, full), NOW)).toEqual(full);
+    const bad = await decryptLocation(key, await encryptLocation(key, { ...fix, name: 'x'.repeat(200), color: 'red', phone: 'javascript:1' }), NOW);
+    expect(bad?.name).toHaveLength(40);
+    expect(bad?.color).toBeUndefined();
+    expect(bad?.phone).toBeUndefined();
+  });
+
+  it('fits a long identity within what the server accepts', async () => {
+    const { key } = await deriveLocationKeys(GROUP);
+    const data = await encryptLocation(key, { memberId: GROUP, lat: -31.123456789, lng: -64.123456789, acc: 9999, t: fix.t, name: 'ñ'.repeat(40), color: '#38bdf8', phone: '+54 9 351 123-4567' });
+    expect(data.length).toBeLessThanOrEqual(400);
+  });
+
   it('rejects another group, tampering, garbage and far-future times', async () => {
     const { key } = await deriveLocationKeys(GROUP);
     const other = await deriveLocationKeys('another-group');
@@ -56,17 +72,16 @@ describe('location crypto', () => {
 
 describe('newestLocations', () => {
   const stored: MemberLocation = { groupId: 'g', memberId: 'm1', lat: 1, lng: 1, acc: 5, t: 100 };
-  const allowed = new Set(['m1', 'm2']);
 
   it('never moves a location backwards in time', () => {
-    expect(newestLocations('g', [{ ...fix, t: 50 }, { ...fix, t: 100 }], [stored], allowed)).toEqual([]);
-    expect(newestLocations('g', [{ ...fix, t: 150 }], [stored], allowed)[0].t).toBe(150);
+    expect(newestLocations('g', [{ ...fix, t: 50 }, { ...fix, t: 100 }], [stored])).toEqual([]);
+    expect(newestLocations('g', [{ ...fix, t: 150 }], [stored])[0].t).toBe(150);
   });
 
-  it('keeps only the newest of duplicates, and ignores unknown members and myself', () => {
-    const fixes = [{ ...fix, memberId: 'm2', t: 10 }, { ...fix, memberId: 'm2', t: 30 }, { ...fix, memberId: 'm2', t: 20 }, { ...fix, memberId: 'stranger', t: 40 }];
-    const result = newestLocations('g', fixes, [], allowed);
-    expect(result.map((r) => [r.memberId, r.t])).toEqual([['m2', 30]]);
+  it('keeps only the newest of duplicates, accepts people who joined by link, and ignores myself', () => {
+    const fixes = [{ ...fix, memberId: 'm2', t: 10 }, { ...fix, memberId: 'm2', t: 30 }, { ...fix, memberId: 'm2', t: 20 }, { ...fix, memberId: 'me', t: 40 }, { ...fix, memberId: 'new', name: 'Nueva', t: 5 }];
+    const result = newestLocations('g', fixes, [], 'me');
+    expect(result.map((r) => [r.memberId, r.t, r.name])).toEqual([['m2', 30, undefined], ['new', 5, 'Nueva']]);
   });
 });
 

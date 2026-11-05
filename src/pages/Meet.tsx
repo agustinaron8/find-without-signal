@@ -28,7 +28,7 @@ import {
   shouldRecordTrackPoint,
 } from '../lib/geo';
 import { formatAge, LOCATION_STALE_MS } from '../lib/lastKnown';
-import { MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
+import { groupRoster, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 const MapView = lazy(() => import('../components/MapView'));
 
@@ -88,17 +88,18 @@ export default function Meet() {
 
   const trackStart = track && currentTripStart(track);
   const locations = lastKnown.locations;
+  const roster = useMemo(() => groupRoster(group?.members ?? [], locations, group?.myMemberId), [group, locations]);
   const destinations = useMemo(() => {
     const list = (group?.meetingPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: p.description }));
     (personal ?? []).forEach((p) => list.push({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, description: undefined }));
     if (trackStart) list.push({ id: TRACK_START_ID, name: 'Donde arranqué', lat: trackStart.lat, lng: trackStart.lng, description: undefined });
     const named = locations.flatMap((l) => {
-      const member = group?.members.find((m) => m.id === l.memberId);
+      const member = roster.find((m) => m.id === l.memberId);
       return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, description: undefined }] : [];
     });
     list.push(...sortMembers(named));
     return list;
-  }, [group, personal, trackStart, locations]);
+  }, [group, personal, trackStart, locations, roster]);
 
   const destination =
     destinations.find((d) => d.id === destinationId) ??
@@ -113,11 +114,11 @@ export default function Meet() {
       ...locations
         .filter((l) => locations.length <= MEMBER_FILTER_FROM || MEMBER_PREFIX + l.memberId === destination?.id)
         .flatMap((l) => {
-          const member = group?.members.find((m) => m.id === l.memberId);
+          const member = roster.find((m) => m.id === l.memberId);
           return member ? [{ id: MEMBER_PREFIX + l.memberId, name: member.name, lat: l.lat, lng: l.lng, color: member.color }] : [];
         }),
     ],
-    [group, personal, locations, destination?.id],
+    [group, personal, locations, roster, destination?.id],
   );
 
   const overlay = useMemo(
@@ -337,6 +338,7 @@ export default function Meet() {
       {sheet === 'group' && (
         <GroupLocationsSheet
           group={group}
+          roster={roster}
           locations={locations}
           position={position}
           sharing={lastKnown.sharing}
@@ -356,7 +358,7 @@ export default function Meet() {
         />
       )}
 
-      {sheet === 'sms' && <SmsDialog members={group.members.filter((m) => m.id !== group.myMemberId)} position={position} onClose={() => setSheet(null)} />}
+      {sheet === 'sms' && <SmsDialog members={roster} position={position} onClose={() => setSheet(null)} />}
 
       {(sheet === 'save' || sheet === 'paste') && (
         <div className="fixed inset-0 z-40 bg-white p-4" style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}>

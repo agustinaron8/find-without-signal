@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { filterMembers, parseMemberList, sortMembers } from '../src/lib/members';
+import type { MemberLocation } from '../src/db';
+import { createJoinedMember, filterMembers, groupRoster, parseMemberList, sortMembers } from '../src/lib/members';
+
+const at = (memberId: string, extra: Partial<MemberLocation> = {}): MemberLocation => ({ groupId: 'g', memberId, lat: 1, lng: 1, acc: 5, t: 1, ...extra });
+
+describe('groupRoster', () => {
+  const listed = { id: 'a', name: 'Ana', color: '#38bdf8' };
+
+  it('adds people known only by their location, without me', () => {
+    const roster = groupRoster([listed, { id: 'me', name: 'Yo', color: '#fff' }], [at('new', { name: 'Nueva', color: '#fbbf24' }), at('me', { name: 'Yo' })], 'me');
+    expect(roster.map((m) => m.name)).toEqual(['Ana', 'Nueva']);
+  });
+
+  it('skips a location with no name to show, and prefers the listed name', () => {
+    expect(groupRoster([], [at('ghost')])).toEqual([]);
+    expect(groupRoster([listed], [at('a', { name: 'Otro', phone: '351123456' })])).toEqual([{ ...listed, phone: '351123456' }]);
+  });
+});
+
+describe('createJoinedMember', () => {
+  it('trims input, marks it as joined and omits an empty phone', () => {
+    const member = createJoinedMember('  Ana  ', ' ');
+    expect(member).toMatchObject({ name: 'Ana', joined: true });
+    expect(member.phone).toBeUndefined();
+  });
+});
 
 const people = [{ name: 'Lucía 10' }, { name: 'María José' }, { name: 'lucia 2' }, { name: 'Ángel' }];
 

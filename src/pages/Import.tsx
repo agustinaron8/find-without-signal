@@ -6,7 +6,7 @@ import Header from '../components/Header';
 import QRScanner from '../components/QRScanner';
 import { db } from '../db';
 import { isIOSBrowser } from '../lib/platform';
-import { filterMembers, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
+import { createJoinedMember, filterMembers, MAX_MEMBER_NAME, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 import { decodeGroup, extractPayload, mergeImportedGroup, type SharedGroup } from '../lib/share';
 
 const INVALID_MESSAGE = 'Ese código no es un grupo de Reencuentro válido.';
@@ -20,6 +20,8 @@ export default function Import() {
   const [error, setError] = useState('');
   const [myMemberId, setMyMemberId] = useState<string>();
   const [memberFilter, setMemberFilter] = useState('');
+  const [joinName, setJoinName] = useState('');
+  const [joinPhone, setJoinPhone] = useState('');
   const existing = useLiveQuery(() => (group ? db.groups.get(group.id) : undefined), [group?.id]);
 
   const load = (input: string): boolean => {
@@ -47,7 +49,13 @@ export default function Import() {
 
   const save = async () => {
     if (!group) return;
-    await db.groups.put(mergeImportedGroup(group, existing, myMemberId));
+    if (joinName.trim()) {
+      const member = createJoinedMember(joinName, joinPhone);
+      const merged = mergeImportedGroup(group, existing);
+      await db.groups.put({ ...merged, members: [...merged.members, member], myMemberId: member.id });
+    } else {
+      await db.groups.put(mergeImportedGroup(group, existing, myMemberId));
+    }
     navigate(`/group/${group.id}`, { replace: true });
   };
 
@@ -65,11 +73,38 @@ export default function Import() {
           <section className="rounded-xl bg-slate-900 p-4">
             <h2 className="text-2xl font-bold">{group.name}</h2>
             <p className="text-slate-300">
-              {group.members.length} {group.members.length === 1 ? 'persona' : 'personas'} ·{' '}
+              {group.members.length > 0 && `${group.members.length} ${group.members.length === 1 ? 'persona' : 'personas'} · `}
               {group.meetingPoints.length} {group.meetingPoints.length === 1 ? 'punto' : 'puntos'}
             </p>
             {group.plan && <p className="mt-2 text-sm text-slate-300">{group.plan}</p>}
           </section>
+
+          {!(existing?.myMemberId && existing.members.some((m) => m.joined && m.id === existing.myMemberId)) && (
+            <section className="space-y-2 rounded-xl bg-slate-900 p-4">
+              <label htmlFor="join-name" className="block font-semibold">
+                {group.members.length > 0 ? 'Si no estás en la lista, escribí tu nombre' : 'Tu nombre y apellido'}
+              </label>
+              <input
+                id="join-name"
+                maxLength={MAX_MEMBER_NAME}
+                className="w-full rounded-lg bg-slate-800 p-3 text-base"
+                placeholder="Como te conocen en el grupo"
+                value={joinName}
+                onChange={(e) => {
+                  setJoinName(e.target.value);
+                  setMyMemberId(undefined);
+                }}
+              />
+              <input
+                aria-label="Tu teléfono"
+                type="tel"
+                className="w-full rounded-lg bg-slate-800 p-3 text-base"
+                placeholder="Tu teléfono (opcional, para SMS)"
+                value={joinPhone}
+                onChange={(e) => setJoinPhone(e.target.value)}
+              />
+            </section>
+          )}
 
           {group.members.length > 0 && (
             <fieldset className="space-y-1 rounded-xl bg-slate-900 p-4">
@@ -90,7 +125,10 @@ export default function Import() {
                     type="radio"
                     name="import-member"
                     checked={myMemberId === member.id}
-                    onChange={() => setMyMemberId(member.id)}
+                    onChange={() => {
+                      setMyMemberId(member.id);
+                      setJoinName('');
+                    }}
                   />
                   <span className="h-3 w-3 rounded-full" style={{ background: member.color }} />
                   {member.name}
