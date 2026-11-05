@@ -47,18 +47,23 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     let failures = 0;
     let timer: number | undefined;
 
-    const exchange = async () => {
+    const locationWrite = async (channel: string, key: CryptoKey): Promise<SyncWrite | undefined> => {
       const { group: current, position: fix, sharing: isSharing } = latest.current;
+      const me = current?.myMemberId;
+      if (!me || !isSharing || !fix || fix.accuracy > MAX_SHARED_ACCURACY_M) return undefined;
+      const d = await encryptLocation(key, { memberId: me, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t });
+      return { m: await memberTag(channel, me), d };
+    };
+
+    const exchange = async () => {
+      const { group: current } = latest.current;
       if (!current) return;
       const { channel, key } = await deriveLocationKeys(groupId);
       const me = current.myMemberId;
       const pendingOff = localStorage.getItem(sharingKey(groupId)) === OFF_PENDING;
 
-      let write: SyncWrite | undefined;
-      if (me && isSharing && fix && fix.accuracy <= MAX_SHARED_ACCURACY_M) {
-        const d = await encryptLocation(key, { memberId: me, lat: fix.lat, lng: fix.lng, acc: fix.accuracy, t: fix.t });
-        write = { m: await memberTag(channel, me), d };
-      } else if (me && pendingOff) {
+      let write = await locationWrite(channel, key);
+      if (!write && me && pendingOff) {
         write = { m: await memberTag(channel, me), d: null };
       }
 
@@ -107,8 +112,20 @@ export function useLastKnown(group: Group | null | undefined, position: Position
     };
     runRef.current = run;
 
+    // Web apps stop when the phone locks, so this is the last chance to leave a fresh location.
+    const flushBeforeLock = async () => {
+      try {
+        const { channel, key } = await deriveLocationKeys(groupId);
+        const write = await locationWrite(channel, key);
+        if (write) await exchangeLocations(channel, write, (url, init) => fetch(url, { ...init, keepalive: true }));
+      } catch {
+        // Nothing else can be done from here; the next exchange happens when the screen comes back.
+      }
+    };
+
     const onVisibility = () => {
-      if (!document.hidden) run();
+      if (document.hidden) flushBeforeLock();
+      else run();
     };
     run();
     document.addEventListener('visibilitychange', onVisibility);

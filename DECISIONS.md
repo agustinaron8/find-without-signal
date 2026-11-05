@@ -16,5 +16,7 @@
 - Última ubicación conocida: la clave y el canal se derivan del id del grupo, que solo viaja en el hash del link. Así funciona con grupos ya compartidos, sin rehacer el QR, y el servidor solo ve texto cifrado.
 - Compartir la ubicación es opcional para cada persona y arranca apagado. Al apagarlo se borra del servidor; si no hay red, se reintenta hasta lograrlo.
 - Un solo POST escribe y lee, para aprovechar un momento de señal. Se manda cada 3 minutos y solo con el Modo Encuentro abierto; los datos expiran a las 72 h.
+- Al fallar, el envío se reintenta cada minuto como máximo (y no cada 3), para aprovechar un momento de señal.
+- Modo bolsillo: pantalla negra con la app abierta y desbloqueada, porque ninguna app web puede usar GPS ni enviar con el teléfono bloqueado. Se sale manteniendo apretado 3 segundos. Al apagarse la pantalla se intenta un último envío con `keepalive`.
 - `/api/loc` no tiene rate limit: un abuso solo agotaría la cuota de la base, y eso apaga esta función sin afectar puntos, flecha ni mapa.
 - La hora de cada posición es la del teléfono al recibirla, no `position.timestamp`: WebKit la informó en microsegundos, y eso rompía la antigüedad y el recorrido.

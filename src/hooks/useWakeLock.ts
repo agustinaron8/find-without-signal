@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-export function useWakeLock() {
+export function useWakeLock(): boolean {
+  const [active, setActive] = useState(false);
+
   useEffect(() => {
     if (!('wakeLock' in navigator)) return;
     let lock: WakeLockSentinel | null = null;
@@ -9,8 +11,13 @@ export function useWakeLock() {
     const acquire = async () => {
       try {
         const next = await navigator.wakeLock.request('screen');
-        if (released) next.release();
-        else lock = next;
+        if (released) {
+          next.release();
+          return;
+        }
+        lock = next;
+        setActive(true);
+        next.addEventListener('release', () => setActive(false));
       } catch {
         // Denied on low battery, for example; the screen just follows the system timeout.
       }
@@ -28,4 +35,6 @@ export function useWakeLock() {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  return active;
 }

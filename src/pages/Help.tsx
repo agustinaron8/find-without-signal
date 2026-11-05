@@ -65,6 +65,10 @@ export default function Help() {
               Si el evento dura más de un día, cerrá el Modo Encuentro cuando no lo necesites: con la pantalla prendida y el GPS,
               la batería se va rápido. Llevá batería externa. Tus grupos y el mapa quedan guardados.
             </li>
+            <li>
+              Con el teléfono bloqueado, la app deja de enviar tu ubicación: ningún navegador deja seguir. Si te están buscando, usá
+              Modo bolsillo en "Ubicación del grupo". Queda desbloqueado y gasta batería, así que usalo solo cuando haga falta.
+            </li>
             <li>En iPhone, usá siempre la app instalada y no borres los datos de Safari ni la app antes de que termine el evento.</li>
             <li>Sin señal, el GPS puede tardar hasta un minuto en ubicarte la primera vez.</li>
             <li>La brújula se confunde cerca de metal e imanes. Alejá el teléfono de otros aparatos y confirmá con la distancia: si baja, vas bien.</li>

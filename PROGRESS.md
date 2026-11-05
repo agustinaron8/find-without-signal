@@ -21,7 +21,10 @@ También probado en WebKit (motor de Safari, emulando iPhone 13): crear grupo, b
 
 Última ubicación conocida: dos teléfonos simulados contra un servidor de prueba (activar, ver al otro, red caída, recargar, moverse, desactivar y borrar), y Chromium con WebKit contra el sitio publicado y la base real.
 
+Red saturada simulada con un proxy que cuelga, demora y corta conexiones, sobre el sitio publicado: la app abre en menos de 200 ms, el mapa carga desde lo guardado, la pantalla no se traba y los envíos se cortan solos y reintentan.
+
 ## No probado todavía
+- Modo bolsillo en teléfonos reales: que la pantalla no se apague y cuánta batería gasta.
 - Última ubicación conocida en una red saturada real.
 - Que los datos sobrevivan a cerrar la app en iPhone: el WebKit de esta PC no guarda el caché en disco, así que esa parte solo se puede ver en un iPhone real. En Chromium sí se probó.
 - Escanear QR con la cámara en iPhone.

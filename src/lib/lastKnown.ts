@@ -5,6 +5,8 @@ export const LOCATION_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 export const LOCATION_STALE_MS = 15 * 60 * 1000;
 export const SYNC_INTERVAL_MS = 3 * 60 * 1000;
 const RETRY_BASE_MS = 30 * 1000;
+// In a crowd a moment of signal is what we are waiting for, so failures retry sooner than the normal pace.
+const RETRY_MAX_MS = 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15 * 1000;
 const MAX_ENTRIES = 100;
 const IV_BYTES = 12;
@@ -76,7 +78,7 @@ export async function decryptLocation(key: CryptoKey, data: string, now = Date.n
 
 export function nextSyncDelay(failures: number, jitter = Math.random()): number {
   if (failures === 0) return SYNC_INTERVAL_MS;
-  return Math.min(RETRY_BASE_MS * 2 ** (failures - 1), SYNC_INTERVAL_MS) * (0.75 + jitter * 0.5);
+  return Math.min(RETRY_BASE_MS * 2 ** (failures - 1), RETRY_MAX_MS) * (0.75 + jitter * 0.5);
 }
 
 export interface SyncWrite {

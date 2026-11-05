@@ -71,11 +71,11 @@ describe('newestLocations', () => {
 });
 
 describe('nextSyncDelay', () => {
-  it('waits the full interval after success and backs off up to it after failures', () => {
+  it('waits the full interval after success and retries within a minute after failures', () => {
     expect(nextSyncDelay(0)).toBe(SYNC_INTERVAL_MS);
     expect(nextSyncDelay(1, 0.5)).toBe(30000);
     expect(nextSyncDelay(2, 0.5)).toBe(60000);
-    expect(nextSyncDelay(20, 0.5)).toBe(SYNC_INTERVAL_MS);
+    expect(nextSyncDelay(20, 0.5)).toBe(60000);
   });
 });
 

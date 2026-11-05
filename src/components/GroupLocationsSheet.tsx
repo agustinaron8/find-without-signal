@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react';
+import { Moon, RefreshCw } from 'lucide-react';
 import { db, type Group, type MemberLocation } from '../db';
 import type { Position } from '../hooks/useGeolocation';
 import { formatDistance, haversine } from '../lib/geo';
@@ -15,6 +15,8 @@ interface Props {
   syncing: boolean;
   onSyncNow: () => void;
   onGoTo: (memberId: string) => void;
+  onPocket: () => void;
+  screenStaysOn: boolean;
   onClose: () => void;
   now: number;
 }
@@ -30,6 +32,8 @@ export default function GroupLocationsSheet({
   syncing,
   onSyncNow,
   onGoTo,
+  onPocket,
+  screenStaysOn,
   onClose,
   now,
 }: Props) {
@@ -76,6 +80,23 @@ export default function GroupLocationsSheet({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {group.myMemberId && sharing && (
+          <div className="rounded-xl bg-slate-100 p-3">
+            <p className="text-sm text-slate-700">
+              Si bloqueás el teléfono deja de enviar. Modo bolsillo apaga la imagen y sigue enviando, pero el teléfono queda
+              desbloqueado y gasta batería. Usalo solo si se separaron o te están buscando.
+            </p>
+            {!screenStaysOn && (
+              <p data-testid="wake-warning" className="mt-2 text-sm font-semibold text-red-800">
+                Este teléfono puede apagar la pantalla solo. Antes de usarlo, poné el bloqueo automático en "Nunca".
+              </p>
+            )}
+            <button type="button" className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 p-3 font-semibold text-white" onClick={onPocket}>
+              <Moon size={20} /> Modo bolsillo
+            </button>
           </div>
         )}
 

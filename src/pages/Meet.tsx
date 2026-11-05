@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import Compass from '../components/Compass';
 import GroupLocationsSheet from '../components/GroupLocationsSheet';
 import type { MapPoint } from '../components/MapView';
+import PocketScreen from '../components/PocketScreen';
 import SignalScreen from '../components/SignalScreen';
 import SmsDialog from '../components/SmsDialog';
 import { db, type TrackPoint } from '../db';
@@ -51,14 +52,14 @@ export default function Meet() {
 
   const { position, error: geoError } = useGeolocation();
   const { heading: compassHeading, needsPermission, denied, requestPermission } = useHeading();
-  useWakeLock();
+  const screenStaysOn = useWakeLock();
   const lastKnown = useLastKnown(group, position);
 
   const storageKey = `meet-destination-${id}`;
   // Persisted because opening the SMS app can make iOS reload this page.
   const [destinationId, setDestinationId] = useState<string | null>(() => localStorage.getItem(storageKey));
   const [view, setView] = useState<'radar' | 'map'>('radar');
-  const [sheet, setSheet] = useState<'sms' | 'paste' | 'save' | 'signal' | 'group' | null>(null);
+  const [sheet, setSheet] = useState<'sms' | 'paste' | 'save' | 'signal' | 'group' | 'pocket' | null>(null);
   const [draftName, setDraftName] = useState('');
   const [pasted, setPasted] = useState('');
   const [sheetError, setSheetError] = useState('');
@@ -321,6 +322,13 @@ export default function Meet() {
 
       {sheet === 'signal' && <SignalScreen onClose={() => setSheet(null)} />}
 
+      {sheet === 'pocket' && (
+        <PocketScreen
+          lastSyncLabel={lastKnown.lastSync ? `Último contacto: ${formatAge(now.getTime() - lastKnown.lastSync)}` : 'Todavía sin conexión'}
+          onClose={() => setSheet('group')}
+        />
+      )}
+
       {sheet === 'group' && (
         <GroupLocationsSheet
           group={group}
@@ -336,6 +344,8 @@ export default function Meet() {
             chooseDestination(MEMBER_PREFIX + memberId);
             setSheet(null);
           }}
+          onPocket={() => setSheet('pocket')}
+          screenStaysOn={screenStaysOn}
           onClose={() => setSheet(null)}
           now={now.getTime()}
         />
