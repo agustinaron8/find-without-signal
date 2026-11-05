@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { db, type Group, type MeetingPoint, type Member } from '../db';
 import { parseCoords } from '../lib/geo';
+import { filterMembers, MEMBER_FILTER_FROM, parseMemberList } from '../lib/members';
 import { MAX_MEMBERS } from '../lib/share';
 
 const MapView = lazy(() => import('../components/MapView'));
@@ -32,6 +33,10 @@ export default function GroupEdit() {
   const [pasted, setPasted] = useState('');
   const [error, setError] = useState('');
   const [locating, setLocating] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [list, setList] = useState('');
+  const [listStatus, setListStatus] = useState('');
+  const [memberFilter, setMemberFilter] = useState('');
 
   useEffect(() => {
     if (existing && !group) setGroup(existing);
@@ -97,6 +102,32 @@ export default function GroupEdit() {
     );
   };
 
+  const addFromList = () => {
+    const { members: parsed, unreadable, duplicates } = parseMemberList(list, group.members.filter((m) => m.name.trim()));
+    const named = group.members.filter((m) => m.name.trim());
+    const room = MAX_MEMBERS - named.length;
+    const added = parsed.slice(0, room);
+    const members = [...named];
+    added.forEach((person) => members.push({ id: crypto.randomUUID(), color: nextColor(members), ...person }));
+    patch({ members });
+    const notes = [
+      `Agregué ${added.length} ${added.length === 1 ? 'persona' : 'personas'}.`,
+      duplicates > 0 && `${duplicates} ya ${duplicates === 1 ? 'estaba' : 'estaban'}.`,
+      unreadable > 0 && `${unreadable} ${unreadable === 1 ? 'línea' : 'líneas'} sin nombre, no ${unreadable === 1 ? 'la' : 'las'} agregué.`,
+      parsed.length > room && `${parsed.length - room} quedaron afuera: el máximo es ${MAX_MEMBERS}.`,
+    ];
+    setListStatus(notes.filter(Boolean).join(' '));
+    if (added.length > 0) setList('');
+  };
+
+  // A long list would push the meeting points far away, so it stays folded behind the search.
+  const longList = group.members.length > MEMBER_FILTER_FROM;
+  const shownMembers = !longList
+    ? group.members
+    : memberFilter.trim()
+      ? filterMembers(group.members, memberFilter)
+      : group.members.filter((m) => !m.name.trim() || m.id === group.myMemberId);
+
   const save = async () => {
     if (!group.name.trim()) return setError('Ponele un nombre al grupo.');
     if (group.meetingPoints.length === 0) return setError('Agregá al menos un punto de encuentro.');
@@ -127,8 +158,18 @@ export default function GroupEdit() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="font-semibold">Personas</h2>
-          {group.members.map((member) => (
+          <h2 className="font-semibold">Personas{group.members.length > 0 && ` (${group.members.length})`}</h2>
+          {longList && (
+            <input
+              type="search"
+              aria-label="Buscar persona"
+              className={inputClass}
+              placeholder="Buscá para editar o marcar quién sos"
+              value={memberFilter}
+              onChange={(e) => setMemberFilter(e.target.value)}
+            />
+          )}
+          {shownMembers.map((member) => (
             <div key={member.id} className="space-y-2 rounded-xl bg-slate-900 p-3">
               <div className="flex items-center gap-2">
                 <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: member.color }} />
@@ -179,6 +220,30 @@ export default function GroupEdit() {
           >
             {group.members.length >= MAX_MEMBERS ? `Máximo ${MAX_MEMBERS} personas` : 'Agregar persona'}
           </button>
+          <button type="button" className="w-full rounded-xl bg-slate-800 p-3 font-semibold" onClick={() => setListOpen(!listOpen)}>
+            Pegar lista de personas
+          </button>
+          {listOpen && (
+            <div className="space-y-2 rounded-xl bg-slate-900 p-3">
+              <p className="text-sm text-slate-400">Una persona por línea. El teléfono es opcional.</p>
+              <textarea
+                aria-label="Lista de personas"
+                rows={6}
+                className={inputClass}
+                placeholder={'Juan Pérez, 351 123 4567\nMaría José\nAna 3517654321'}
+                value={list}
+                onChange={(e) => setList(e.target.value)}
+              />
+              <button type="button" disabled={!list.trim()} className="w-full rounded-xl bg-sky-400 p-3 font-semibold text-slate-950 disabled:opacity-50" onClick={addFromList}>
+                Agregar a la lista
+              </button>
+            </div>
+          )}
+          {listStatus && (
+            <p role="status" className="text-sm text-slate-300">
+              {listStatus}
+            </p>
+          )}
         </section>
 
         <section className="space-y-2">

@@ -20,5 +20,6 @@
 - Modo bolsillo: pantalla negra con la app abierta y desbloqueada, porque ninguna app web puede usar GPS ni enviar con el teléfono bloqueado. Se sale manteniendo apretado 3 segundos. Al apagarse la pantalla se intenta un último envío con `keepalive`.
 - Tope de 100 personas por grupo. Sobre unas 35-40 el QR no entra: el grupo se comparte por link, antes del evento y con señal.
 - Con más de 12 personas ubicadas, el mapa muestra solo los puntos y a la persona elegida como destino: si no, las etiquetas tapan los puntos de encuentro.
+- Lista de personas pegada: una por línea, con teléfono opcional. Con más de 12 personas, el editor las pliega detrás de un buscador para no alejar los puntos de encuentro.
 - `/api/loc` no tiene rate limit: un abuso solo agotaría la cuota de la base, y eso apaga esta función sin afectar puntos, flecha ni mapa.
 - La hora de cada posición es la del teléfono al recibirla, no `position.timestamp`: WebKit la informó en microsegundos, y eso rompía la antigüedad y el recorrido.
