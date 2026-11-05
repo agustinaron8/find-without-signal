@@ -1,10 +1,9 @@
 # Progreso
 
-**Estado: MVP completo en el repo. Falta publicarlo en Vercel y probarlo en teléfonos reales antes del lunes 9/11.**
+**Estado: publicado en https://find-without-signal.vercel.app. Falta probarlo en teléfonos reales antes del lunes 9/11.**
 
 ## Bloqueado (necesita a Agustín)
-1. **Conectar Vercel** (2 min): https://vercel.com/new/import?s=https://github.com/agustinaron8/find-without-signal
-2. **Probar en un iPhone y un Android reales**, idealmente antes del domingo 8/11, con el checklist de abajo. Es el mayor riesgo que queda.
+1. **Probar en un iPhone y un Android reales**, idealmente antes del domingo 8/11, con el checklist de abajo. Es el mayor riesgo que queda.
 
 ## Hecho
 Todas las tareas del plan (1 a 15), más "Hacerme ver" (pantalla que parpadea para que te encuentren).
@@ -15,6 +14,8 @@ Probado en Chromium, con GPS y brújula simulados:
 - QR de un teléfono a otro, sin red, con video simulado en la cámara.
 - Flecha, distancia, llegada, SMS, pegar ubicación, guardar lugar y volver por donde vine.
 - 60 tests unitarios.
+
+Probado sobre el sitio publicado, en Chromium: crear grupo, bajar el mapa, cerrar el navegador y reabrirlo con DNS bloqueado. Abren todas las rutas y el mapa se ve con calles, sin pedidos fallidos.
 
 También probado en WebKit (motor de Safari, emulando iPhone 13): crear grupo, bajar mapa, QR en pantalla, radar, flecha, SMS, y abrir la app con el servidor apagado.
 
