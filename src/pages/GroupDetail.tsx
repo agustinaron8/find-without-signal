@@ -1,12 +1,18 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { QrCode, Share2 } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
+import QRCode from '../components/QRCode';
 import { db, deleteGroup } from '../db';
+import { buildShareUrl } from '../lib/share';
 
 export default function GroupDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const group = useLiveQuery(() => db.groups.get(id).then((g) => g ?? null), [id]);
+  const [showQR, setShowQR] = useState(false);
+  const [shareStatus, setShareStatus] = useState('');
 
   if (group === undefined) return <Header title="Cargando…" backTo="/" />;
   if (group === null) {
@@ -23,6 +29,24 @@ export default function GroupDetail() {
     await deleteGroup(group.id);
     navigate('/', { replace: true });
   };
+
+  const shareUrl = buildShareUrl(group);
+
+  const shareLink = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: group.name, url: shareUrl });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareStatus('Link copiado.');
+      }
+    } catch (err) {
+      // Closing the system share sheet rejects with AbortError; that is not a failure.
+      if ((err as Error).name !== 'AbortError') setShareStatus('No se pudo compartir. Probá con el QR.');
+    }
+  };
+
+  if (showQR) return <QRCode value={shareUrl} title={group.name} onClose={() => setShowQR(false)} />;
 
   return (
     <>
@@ -70,6 +94,30 @@ export default function GroupDetail() {
             </ul>
           </section>
         )}
+
+        <section className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="flex items-center justify-center gap-2 rounded-xl bg-slate-800 p-3 font-semibold"
+              onClick={shareLink}
+            >
+              <Share2 size={20} /> Compartir link
+            </button>
+            <button
+              type="button"
+              className="flex items-center justify-center gap-2 rounded-xl bg-slate-800 p-3 font-semibold"
+              onClick={() => setShowQR(true)}
+            >
+              <QrCode size={20} /> Mostrar QR
+            </button>
+          </div>
+          {shareStatus && (
+            <p role="status" className="text-center text-sm text-slate-300">
+              {shareStatus}
+            </p>
+          )}
+        </section>
 
         <div className="grid grid-cols-2 gap-2">
           <Link to={`/group/${group.id}/edit`} className="rounded-xl bg-slate-800 p-3 text-center font-semibold">

@@ -3,6 +3,7 @@ import UpdateToast from './components/UpdateToast';
 import GroupDetail from './pages/GroupDetail';
 import GroupEdit from './pages/GroupEdit';
 import Home from './pages/Home';
+import Import from './pages/Import';
 
 export default function App() {
   return (
@@ -12,6 +13,8 @@ export default function App() {
         <Route path="/group/new" element={<GroupEdit />} />
         <Route path="/group/:id" element={<GroupDetail />} />
         <Route path="/group/:id/edit" element={<GroupEdit />} />
+        <Route path="/import" element={<Import />} />
+        <Route path="/i" element={<Import />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <UpdateToast />
