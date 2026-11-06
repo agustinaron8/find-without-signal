@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { angleBetween, effectiveScreenAngle, headingFromOrientation, normalizeDegrees, type OrientationReading } from '../lib/geo';
 
-const SMOOTHING_MS = 250;
-const MAX_SMOOTHING_MS = 1000;
-const SMOOTHING_PER_JITTER_DEG = 25;
+// Small changes are hand shake and get averaged; big ones are the person turning and are followed
+// almost at once, so the arrow never lags behind a turn.
+const SMOOTHING_MS = 400;
+const TURN_SMOOTHING_MS = 80;
+const TURN_DEG = 20;
 // iOS sends readings many times per second, so a silence this long means the sensor stopped.
 const STALL_MS = 3000;
 const MIN_CHANGE_DEG = 1;
@@ -39,6 +41,8 @@ export function useHeading() {
   const [granted, setGranted] = useState(() => typeof orientationApi()?.requestPermission !== 'function');
   const [denied, setDenied] = useState(false);
   const [weak, setWeak] = useState(false);
+  // Once the compass has answered, the walking direction must not stand in for it.
+  const [worked, setWorked] = useState(false);
   const debug = useRef<HeadingDebug | null>(null);
 
   useEffect(() => {
@@ -46,7 +50,6 @@ export function useHeading() {
     let smoothed: number | null = null;
     let shown: number | null = null;
     let lastEvent = 0;
-    let jitter = 0;
 
     const onOrientation = (event: DeviceOrientationEvent) => {
       const iosError = (event as OrientationReading).webkitCompassAccuracy;
@@ -79,12 +82,9 @@ export function useHeading() {
       const now = performance.now();
       if (smoothed === null || !Number.isFinite(smoothed)) {
         smoothed = reading;
-        jitter = 0;
       } else {
         const delta = angleBetween(reading, smoothed);
-        // A shaky sensor gets a calmer arrow; a steady one stays quick to follow turns.
-        jitter = jitter * 0.9 + Math.abs(delta) * 0.1;
-        const tau = Math.min(MAX_SMOOTHING_MS, SMOOTHING_MS + jitter * SMOOTHING_PER_JITTER_DEG);
+        const tau = Math.abs(delta) > TURN_DEG ? TURN_SMOOTHING_MS : SMOOTHING_MS;
         smoothed = normalizeDegrees(smoothed + delta * (1 - Math.exp((lastEvent - now) / tau)));
       }
       lastEvent = now;
@@ -95,6 +95,7 @@ export function useHeading() {
       }
       // iOS keeps the grant for the session, so events can arrive without asking again.
       setGranted(true);
+      setWorked(true);
     };
 
     const start = () => {
@@ -141,5 +142,5 @@ export function useHeading() {
     }
   }, []);
 
-  return { heading, weak, debug, needsPermission: !granted && !denied, denied, requestPermission };
+  return { heading, worked, weak, debug, needsPermission: !granted && !denied, denied, requestPermission };
 }

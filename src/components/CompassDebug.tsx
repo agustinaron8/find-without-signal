@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { HeadingDebug } from '../hooks/useHeading';
 import type { LatLng } from '../lib/geo';
 
@@ -8,8 +9,8 @@ interface Props {
   speed: number | null;
   gpsHeading: number | null;
   permission: string;
+  onCopyLog: () => Promise<void> | undefined;
   magnetic: number | null;
-  offset: number;
   heading: number | null;
   toTarget: number | null;
   position: (LatLng & { accuracy: number }) | null;
@@ -18,7 +19,8 @@ interface Props {
 
 const num = (value: number | null | undefined, digits = 0) => (typeof value === 'number' ? value.toFixed(digits) : '–');
 
-export default function CompassDebug({ raw, source, rotation, speed, gpsHeading, permission, magnetic, offset, heading, toTarget, position, destination }: Props) {
+export default function CompassDebug({ raw, source, rotation, speed, gpsHeading, permission, onCopyLog, magnetic, heading, toTarget, position, destination }: Props) {
+  const [copied, setCopied] = useState(false);
   const rows: [string, string][] = [
     ['Fuente', source],
     ['Permiso brújula', permission],
@@ -30,7 +32,6 @@ export default function CompassDebug({ raw, source, rotation, speed, gpsHeading,
     ['Ángulo informado / usado', `${num(raw?.reportedAngle)} / ${num(raw?.usedAngle)}`],
     ['Pantalla', `${window.innerWidth}×${window.innerHeight}`],
     ['Magnético', num(magnetic)],
-    ['Corrección por marcha', num(offset)],
     ['Rumbo final', num(heading)],
     ['Rumbo al destino', num(toTarget)],
     ['Rotación flecha', num(rotation)],
@@ -46,6 +47,9 @@ export default function CompassDebug({ raw, source, rotation, speed, gpsHeading,
           <dd className="text-right font-bold">{value}</dd>
         </div>
       ))}
+      <button type="button" className="mt-2 w-full rounded bg-slate-950 p-2 font-sans font-semibold text-white" onClick={() => onCopyLog()?.then(() => setCopied(true))}>
+        {copied ? 'Registro copiado: pegalo en un mensaje' : 'Copiar registro'}
+      </button>
     </dl>
   );
 }

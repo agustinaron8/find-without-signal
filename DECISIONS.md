@@ -28,7 +28,8 @@
 - Cartel imprimible con QR, puntos, plan y pasos, como respaldo en papel.
 - `/api/loc` no tiene rate limit: un abuso solo agotaría la cuota de la base, y eso apaga esta función sin afectar puntos, flecha ni mapa.
 - La flecha corrige la declinación magnética de FAdeA (-7,1°, modelo WMM, noviembre 2026) dentro de 300 km: las brújulas dan el norte magnético y el rumbo al punto usa el norte verdadero. Por eso puede diferir unos 7° de una brújula magnética nativa.
-- Al caminar en línea recta, la dirección real sale de las posiciones del GPS, que ningún metal altera. Si la brújula difiere más de 45° se corrige con esa diferencia, y se avisa; deja de corregirse cuando difiere menos de 25°.
+- Al caminar en línea recta, la dirección real sale de las posiciones del GPS y solo se usa para decir "Vas bien / Te estás alejando". Se probó corregir la brújula con ella y se sacó: invertía la flecha cuando alguien caminaba sin apuntar el teléfono hacia adelante, por ejemplo mirando el punto al alejarse.
+- Una sola fuente para la flecha: la brújula si alguna vez respondió en la sesión; si se calla, la flecha se oculta en vez de pasar a la dirección de marcha. La marcha solo reemplaza a un teléfono sin brújula, y el rumbo del GPS solo manda a más de 5 m/s, en vehículo: caminando, la velocidad del GPS llega a picos de más de 2 m/s.
 - Las posiciones se filtran por precisión: un dato grueso de antenas no pisa un buen GPS. La precisión mostrada nunca es mejor que la que informa el teléfono.
 - Llegada: el piso bajó de 25 a 15 m, porque entre mucha gente 25 m no alcanzan para verse y hacía desaparecer la flecha. Con un error mayor a 25 m se dice "Estás cerca", no "Estás en el punto". El error del punto guardado también cuenta.
 - "Guardar este lugar" muestra la precisión y pide esperar si supera 25 m, pero deja guardar igual: puede no haber tiempo para esperar.

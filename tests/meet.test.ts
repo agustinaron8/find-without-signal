@@ -192,21 +192,11 @@ describe('filterFix', () => {
 });
 
 describe('recentWalk', () => {
-  const north = (seconds: number, heading: number | null = 0) => ({
-    lat: -31.45 + seconds * 1.3 / 111320,
-    lng: -64.27,
-    accuracy: 8,
-    t: seconds * 1000,
-    heading,
-  });
-  const walking = (heading: number | null) => Array.from({ length: 16 }, (_, i) => north(i, heading));
+  const north = (seconds: number) => ({ lat: -31.45 + seconds * 1.3 / 111320, lng: -64.27, accuracy: 8, t: seconds * 1000 });
+  const walking = () => Array.from({ length: 16 }, (_, i) => north(i));
 
   it('finds the course of a steady walk', () => {
-    expect(recentWalk(walking(0))?.course).toBeCloseTo(0, 0);
-  });
-  it('measures how far off the compass is', () => {
-    expect(recentWalk(walking(80))?.compassError).toBeCloseTo(-80, 0);
-    expect(recentWalk(walking(null))?.compassError).toBeNull();
+    expect(recentWalk(walking())?.course).toBeCloseTo(0, 0);
   });
   it('says nothing while standing, even if the GPS drifts', () => {
     const drift = Array.from({ length: 16 }, (_, i) => ({ ...north(0), lat: -31.45 + (i % 2) * 20 / 111320, t: i * 1000 }));
@@ -215,7 +205,7 @@ describe('recentWalk', () => {
     expect(recentWalk([])).toBeNull();
   });
   it('does not trust a move smaller than the GPS error', () => {
-    expect(recentWalk(walking(0).map((s) => ({ ...s, accuracy: 30 })))).toBeNull();
+    expect(recentWalk(walking().map((s) => ({ ...s, accuracy: 30 })))).toBeNull();
   });
 });
 

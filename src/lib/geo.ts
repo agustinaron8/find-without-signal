@@ -148,18 +148,8 @@ const WALK_MIN_SPAN_MS = 5000;
 const WALK_MIN_DISTANCE_M = 12;
 const WALK_MIN_STRAIGHTNESS = 0.7;
 
-export interface WalkSample extends Fix {
-  heading: number | null;
-}
-
-export interface Walk {
-  course: number;
-  compassError: number | null;
-}
-
 // Where the person is really going, from their own positions: no magnet can disturb this.
-// The compass is averaged over the same window, so turning a corner does not read as an error.
-export function recentWalk(samples: WalkSample[]): Walk | null {
+export function recentWalk(samples: Fix[]): { course: number } | null {
   const last = samples[samples.length - 1];
   if (!last) return null;
   const recent = samples.filter((s) => last.t - s.t <= WALK_WINDOW_MS);
@@ -170,9 +160,7 @@ export function recentWalk(samples: WalkSample[]): Walk | null {
   if (moved < Math.max(WALK_MIN_DISTANCE_M, worst * 1.5)) return null;
   const path = recent.slice(1).reduce((sum, s, i) => sum + haversine(recent[i], s), 0);
   if (moved / path < WALK_MIN_STRAIGHTNESS) return null;
-  const course = bearing(first, last);
-  const headings = recent.flatMap((s) => (s.heading === null ? [] : [s.heading]));
-  return { course, compassError: headings.length * 2 >= recent.length ? angleBetween(course, circularMean(headings)) : null };
+  return { course: bearing(first, last) };
 }
 
 export type WalkTrend = 'closer' | 'sideways' | 'away';

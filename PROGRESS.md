@@ -30,6 +30,8 @@ Unirse por link: grupo sin lista, cada persona escribe su nombre y se ven entre 
 Mejoras de preparación: invitación con pasos, aviso en Safari, mapa automático al unirse, estados rápidos y cartel imprimible. Revisión de código con 10 correcciones.
 
 Flecha y precisión (5-6/11, tras pruebas en un iPhone real): norte verdadero, teléfono levantado en Android, filtro de posiciones, precisión al guardar un lugar, aviso "Vas bien / Te estás alejando" al caminar, corrección de una brújula desviada, aviso de GPS detenido. En un iPhone la flecha dio bien: el error que se veía era un punto mal cargado.
+- Flecha inestable (6/11, iPhone real al aire libre): la causa reproducida fue la corrección automática de la brújula por la dirección de marcha, que invertía la flecha si el teléfono no apuntaba hacia adelante (62 de 65 lecturas invertidas en la simulación). Se sacó: la flecha usa una sola fuente. Simulado con GPS de ±4 m caminando 40 m, ida y vuelta, en tres posturas: 0 de 198 lecturas con más de 45° de error.
+- Diagnóstico: "Copiar registro" guarda una fila por posición de los últimos minutos (fuente, brújula, rumbo, rotación, distancia, precisión).
 - La flecha no puede quedar trabada: se descartan datos NaN, y si la brújula deja de mandar datos 3 s se oculta y el próximo toque la vuelve a pedir. En vehículo (más de 2 m/s) manda el rumbo del GPS.
 - Diagnóstico: 5 toques rápidos sobre la distancia muestran sensores, fuente, permiso y rotación.
 - Recorrido: el mapa dibuja solo el viaje actual y se puede reiniciar. Los lugares guardados se pueden borrar.

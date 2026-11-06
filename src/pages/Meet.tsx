@@ -43,9 +43,11 @@ const TRACK_START_ID = 'track-start';
 const MEMBER_PREFIX = 'member-';
 const PERSONAL_COLOR = '#16a34a';
 const GPS_HEADING_MIN_SPEED_MS = 0.5;
-// Faster than walking: in a vehicle the GPS course is right and the compass is thrown off by metal.
-const GPS_HEADING_FIRST_SPEED_MS = 2;
+// Only a vehicle goes this fast. Walking GPS speed can spike past 2 m/s, and a course taken
+// from one of those spikes would turn the arrow for a moment.
+const GPS_HEADING_FIRST_SPEED_MS = 5;
 const DEBUG_TAPS = 5;
+const LOG_ROWS = 300;
 const DEBUG_TAP_WINDOW_MS = 2000;
 const TRACK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const GPS_STALE_MS = 30000;
@@ -71,9 +73,9 @@ export default function Meet() {
   );
 
   const { position, error: geoError } = useGeolocation();
-  const { heading: magneticHeading, weak: weakCompass, debug: headingDebug, needsPermission, denied, requestPermission } = useHeading();
+  const { heading: magneticHeading, worked: compassWorked, weak: weakCompass, debug: headingDebug, needsPermission, denied, requestPermission } = useHeading();
   const compassHeading = magneticHeading !== null && position ? normalizeDegrees(magneticHeading + magneticDeclination(position)) : magneticHeading;
-  const walk = useWalk(position, compassHeading);
+  const walkCourse = useWalk(position);
   const screenStaysOn = useWakeLock();
   const lastKnown = useLastKnown(group, position);
 
@@ -88,6 +90,8 @@ export default function Meet() {
   const [now, setNow] = useState(() => new Date());
   const [showDebug, setShowDebug] = useState(false);
   const debugTaps = useRef<number[]>([]);
+  const log = useRef<string[]>([]);
+  const loggedFix = useRef(0);
   const lastTrackRef = useRef<TrackPoint | undefined>(undefined);
   const arrivedAt = useRef<string | null>(null);
 
@@ -172,9 +176,14 @@ export default function Meet() {
   const gpsHeading = position?.heading ?? null;
   const vehicleHeading = speed > GPS_HEADING_FIRST_SPEED_MS ? gpsHeading : null;
   const movingHeading = speed > GPS_HEADING_MIN_SPEED_MS ? gpsHeading : null;
-  const heading = vehicleHeading ?? walk.correctedCompass ?? walk.course ?? movingHeading;
+  // One source at a time: switching between the compass and the walking direction made the arrow
+  // jump whenever the phone was not aimed where the person walked. The walk only stands in for a
+  // phone that never gave compass readings; a compass that stops just hides the arrow.
+  const walkHeading = compassWorked ? null : (walkCourse ?? movingHeading);
+  const heading = vehicleHeading ?? compassHeading ?? walkHeading;
   const headingSource =
-    vehicleHeading !== null ? 'GPS rápido' : walk.correctedCompass !== null ? 'brújula' : walk.course !== null ? 'marcha' : movingHeading !== null ? 'GPS' : 'ninguna';
+    vehicleHeading !== null ? 'GPS rápido' : compassHeading !== null ? 'brújula' : walkCourse !== null && walkHeading !== null ? 'marcha' : walkHeading !== null ? 'GPS' : 'ninguna';
+  const copyLog = () => navigator.clipboard?.writeText(['hora,fuente,magnetico,rumbo,destino,rotacion,distancia,precision,velocidad,beta', ...log.current].join('\n'));
   const tapDistance = () => {
     const at = Date.now();
     debugTaps.current = [...debugTaps.current.filter((t) => at - t < DEBUG_TAP_WINDOW_MS), at];
@@ -187,6 +196,14 @@ export default function Meet() {
   const rawRotation = toTarget !== null && heading !== null ? normalizeDegrees(toTarget - heading) : null;
   // A NaN rotation is dropped by CSS and leaves the arrow frozen pointing up, which looks valid.
   const rotation = rawRotation !== null && Number.isFinite(rawRotation) ? rawRotation : null;
+  // One row per GPS fix for the last few minutes: enough to see what the arrow did on a real walk.
+  // Written here and not in an effect, because hooks cannot follow the early returns above.
+  if (position && loggedFix.current !== position.t) {
+    loggedFix.current = position.t;
+    const r = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : '');
+    const row = [new Date().toISOString().slice(11, 19), headingSource, r(magneticHeading), r(heading), r(toTarget), r(rotation), r(distance), r(position.accuracy), position.speed?.toFixed(1) ?? '', r(headingDebug.current?.beta)];
+    log.current = [...log.current.slice(1 - LOG_ROWS), row.join(',')];
+  }
   const poorFix = !!position && isPoorFix(position.accuracy);
   const gpsAge = position ? now.getTime() - position.t : 0;
   const gpsStale = gpsAge > GPS_STALE_MS;
@@ -195,7 +212,7 @@ export default function Meet() {
   const arrived = distance !== null && !gpsStale && hasArrived(distance, totalAccuracy, arrivedAt.current === destination?.id);
   arrivedAt.current = arrived ? (destination?.id ?? null) : null;
   const roughArrow = distance !== null && totalAccuracy > distance * ROUGH_ARROW_RATIO;
-  const trend = walk.course !== null && toTarget !== null && !arrived && !gpsStale ? TREND_TEXT[walkTrend(walk.course, toTarget)] : null;
+  const trend = walkCourse !== null && toTarget !== null && !arrived && !gpsStale ? TREND_TEXT[walkTrend(walkCourse, toTarget)] : null;
   const canSaveHere = !!position && !gpsStale && position.accuracy <= SAVE_MAX_ACCURACY_M;
   const plan = group.planTimes?.length ? nextPlanTime(group.planTimes, now) : null;
   const destinationLocation = destination?.id.startsWith(MEMBER_PREFIX)
@@ -341,11 +358,6 @@ export default function Meet() {
                   Brújula imprecisa: mové el teléfono dibujando un 8
                 </p>
               )}
-              {walk.corrected && (
-                <p data-testid="compass-corrected" className="font-semibold text-amber-800">
-                  La brújula estaba desviada: la corregí con tu dirección al caminar
-                </p>
-              )}
               {toTarget !== null && rotation === null && (
                 <p className="text-lg font-semibold">
                   {denied || !needsPermission ? 'Caminá unos pasos para orientar la flecha' : 'Activá la brújula para ver la flecha'}
@@ -387,8 +399,8 @@ export default function Meet() {
               speed={position?.speed ?? null}
               gpsHeading={gpsHeading}
               permission={denied ? 'negado' : needsPermission ? 'falta pedir' : 'concedido'}
+              onCopyLog={copyLog}
               magnetic={magneticHeading}
-              offset={walk.offset}
               heading={heading}
               toTarget={toTarget}
               position={position}
