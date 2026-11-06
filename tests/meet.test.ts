@@ -25,6 +25,9 @@ describe('nextRotation', () => {
     expect(nextRotation(720, 90)).toBe(810);
     expect(Math.abs(nextRotation(0, 180))).toBe(180);
   });
+  it('recovers from NaN instead of freezing the arrow', () => {
+    expect(nextRotation(NaN, 90)).toBe(90);
+  });
 });
 
 describe('hasArrived', () => {
@@ -125,6 +128,11 @@ describe('headingFromOrientation', () => {
   it('accounts for a sideways screen', () => {
     expect(headingFromOrientation({ alpha: 0, beta: 0, gamma: 0, absolute: true }, 90)).toBeCloseTo(90);
   });
+  it('never returns NaN', () => {
+    expect(headingFromOrientation({ alpha: 0, webkitCompassHeading: NaN }, 0)).toBeNull();
+    expect(headingFromOrientation({ alpha: NaN, absolute: true }, 0)).toBeNull();
+    expect(headingFromOrientation({ alpha: 90, beta: NaN, gamma: 0, absolute: true }, 0)).toBe(270);
+  });
   it('ignores relative orientation, which is not a compass', () => {
     expect(headingFromOrientation({ alpha: 90, absolute: false }, 0)).toBeNull();
     expect(headingFromOrientation({ alpha: null, absolute: true }, 0)).toBeNull();
@@ -172,6 +180,10 @@ describe('filterFix', () => {
   it('trusts a new fix after a long gap', () => {
     const next = filterFix(good, { lat: -31.46, lng: -64.28, accuracy: 10, t: 600000 });
     expect(next.lat).toBeCloseTo(-31.46, 4);
+  });
+  it('starts over instead of carrying NaN forward', () => {
+    const next = filterFix({ ...good, lat: NaN }, { ...good, accuracy: 10, t: 1000 });
+    expect(next.lat).toBe(good.lat);
   });
   it('survives a browser that reports zero accuracy', () => {
     const next = filterFix({ ...good, accuracy: 0 }, { ...good, accuracy: 0 });

@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import { db, type Group, type MeetingPoint, type Member } from '../db';
 import { parseCoords } from '../lib/geo';
+import { findShortLink, resolveCoords, SHORT_LINK_MESSAGES } from '../lib/mapsLink';
 import { filterMembers, MEMBER_COLORS, MEMBER_FILTER_FROM, parseMemberList } from '../lib/members';
 import { MAX_MEMBERS } from '../lib/share';
 
@@ -30,6 +31,7 @@ export default function GroupEdit() {
   const existing = useLiveQuery(() => (id ? db.groups.get(id).then((g) => g ?? null) : null), [id]);
   const [group, setGroup] = useState<Group | null>(id ? null : newGroup());
   const [pasted, setPasted] = useState('');
+  const [resolving, setResolving] = useState(false);
   const [error, setError] = useState('');
   const [locating, setLocating] = useState(false);
   const [listOpen, setListOpen] = useState(false);
@@ -75,15 +77,16 @@ export default function GroupEdit() {
     patch({ meetingPoints: rest });
   };
 
-  const addFromPaste = () => {
-    const coords = parseCoords(pasted);
-    if (!coords) {
-      setError('No encontré coordenadas en ese texto.');
-      return;
-    }
+  const addFromPaste = async () => {
+    setResolving(true);
+    const coords = await resolveCoords(pasted);
+    setResolving(false);
+    if (typeof coords === 'string') return setError(SHORT_LINK_MESSAGES[coords]);
+    if (!coords) return setError('No encontré coordenadas en ese texto.');
     addPoint(coords.lat, coords.lng);
     setPasted('');
   };
+  const pastedCoords = parseCoords(pasted);
 
   const addFromLocation = () => {
     if (!navigator.geolocation) {
@@ -315,17 +318,33 @@ export default function GroupEdit() {
             <LocateFixed size={20} /> {locating ? 'Buscando ubicación…' : 'Usar mi ubicación actual'}
           </button>
           <div className="flex gap-2">
-            <input
+            {/* Several lines, so a long link can be read whole before adding it. */}
+            <textarea
               aria-label="Coordenadas o link de Google Maps"
-              className={inputClass}
+              rows={pasted.length > 30 ? 3 : 1}
+              className={`${inputClass} resize-none break-all`}
               placeholder="Pegá coordenadas o link de Maps"
               value={pasted}
               onChange={(e) => setPasted(e.target.value)}
             />
-            <button type="button" className="shrink-0 rounded-lg bg-slate-800 px-4 font-semibold" onClick={addFromPaste}>
-              Agregar
+            <button
+              type="button"
+              disabled={resolving || !pasted.trim()}
+              className="shrink-0 rounded-lg bg-slate-800 px-4 font-semibold disabled:opacity-60"
+              onClick={addFromPaste}
+            >
+              {resolving ? 'Buscando…' : 'Agregar'}
             </button>
           </div>
+          {pasted.trim() && (
+            <p data-testid="paste-preview" className="text-sm text-slate-400">
+              {findShortLink(pasted)
+                ? 'Link corto de Google Maps: se abre con internet al tocar Agregar.'
+                : pastedCoords
+                  ? `Encontré ${pastedCoords.lat.toFixed(5)}, ${pastedCoords.lng.toFixed(5)}`
+                  : 'Todavía no encuentro coordenadas.'}
+            </p>
+          )}
         </section>
 
         <section className="space-y-2">

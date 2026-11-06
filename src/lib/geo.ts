@@ -63,6 +63,7 @@ const COORD_PATTERNS = [
   new RegExp(`!3d${NUM}!4d${NUM}`),
   new RegExp(`[?&](?:q|ll|query|destination|daddr)=(?:loc:)?${NUM},\\s*${NUM}`),
   new RegExp(`geo:${NUM},${NUM}`),
+  new RegExp(`/maps/(?:search|place)/${NUM},[\\s+]*${NUM}`),
   new RegExp(`@${NUM},${NUM}`),
   new RegExp(`${DECIMAL}\\s*,\\s*${DECIMAL}`),
   new RegExp(`^\\s*${NUM}\\s*,\\s*${NUM}\\s*$`),
@@ -89,6 +90,8 @@ export const isPoorFix = (accuracy: number) => accuracy > 50;
 
 // Accumulates rotation so a move from 359° to 1° turns 2° instead of spinning back around.
 export function nextRotation(previous: number, target: number): number {
+  // Once NaN, the sum would stay NaN for the rest of the session.
+  if (!Number.isFinite(previous)) return target;
   const delta = ((target - previous) % 360 + 540) % 360 - 180;
   return previous + delta;
 }
@@ -128,7 +131,7 @@ export interface Fix extends LatLng {
 // The error only grows by what the person could have moved, and never drops below what the
 // phone reports: averaging does not remove the error from signals bouncing off nearby things.
 export function filterFix(previous: Fix | null, next: Fix, speed: number | null = null): Fix {
-  if (!previous) return next;
+  if (!previous || ![previous.lat, previous.lng, previous.accuracy].every(Number.isFinite)) return next;
   const seconds = Math.max(0, next.t - previous.t) / 1000;
   const grown = previous.accuracy + Math.max(FOOT_SPEED_MS, speed ?? 0) * seconds;
   const gain = grown ** 2 / (grown ** 2 + Math.max(next.accuracy, 1) ** 2);
@@ -247,12 +250,13 @@ export function effectiveScreenAngle(reported: number, width: number, height: nu
 
 export function headingFromOrientation(event: OrientationReading, screenAngle: number): number | null {
   if (typeof event.webkitCompassHeading === 'number') {
-    if ((event.webkitCompassAccuracy ?? 0) < 0) return null;
+    if ((event.webkitCompassAccuracy ?? 0) < 0 || !Number.isFinite(event.webkitCompassHeading)) return null;
     return normalizeDegrees(event.webkitCompassHeading + screenAngle);
   }
-  if (!event.absolute || typeof event.alpha !== 'number') return null;
-  if (typeof event.beta !== 'number' || typeof event.gamma !== 'number') return normalizeDegrees(360 - event.alpha + screenAngle);
-  return headingFromAngles(event.alpha, event.beta, event.gamma, screenAngle);
+  if (!event.absolute || !Number.isFinite(event.alpha)) return null;
+  const alpha = event.alpha as number;
+  if (!Number.isFinite(event.beta) || !Number.isFinite(event.gamma)) return normalizeDegrees(360 - alpha + screenAngle);
+  return headingFromAngles(alpha, event.beta as number, event.gamma as number, screenAngle);
 }
 
 // Alpha alone is wrong on a raised phone, where turning shows up in gamma instead. This follows

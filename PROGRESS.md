@@ -29,6 +29,12 @@ Unirse por link: grupo sin lista, cada persona escribe su nombre y se ven entre 
 
 Mejoras de preparación: invitación con pasos, aviso en Safari, mapa automático al unirse, estados rápidos y cartel imprimible. Revisión de código con 10 correcciones.
 
+Flecha y precisión (5-6/11, tras pruebas en un iPhone real): norte verdadero, teléfono levantado en Android, filtro de posiciones, precisión al guardar un lugar, aviso "Vas bien / Te estás alejando" al caminar, corrección de una brújula desviada, aviso de GPS detenido. En un iPhone la flecha dio bien: el error que se veía era un punto mal cargado.
+- La flecha no puede quedar trabada: se descartan datos NaN, y si la brújula deja de mandar datos 3 s se oculta y el próximo toque la vuelve a pedir. En vehículo (más de 2 m/s) manda el rumbo del GPS.
+- Diagnóstico: 5 toques rápidos sobre la distancia muestran sensores, fuente, permiso y rotación.
+- Recorrido: el mapa dibuja solo el viaje actual y se puede reiniciar. Los lugares guardados se pueden borrar.
+- Links cortos de Google Maps (`maps.app.goo.gl`, `goo.gl/maps`): los abre `/api/resolve-maps`, que solo consulta hosts de Google. Probado con 12 links reales: 10 dan el lugar, uno de "cómo llegar" se rechaza y uno de un lugar compartido desde la app de Maps no trae coordenadas en ningún lado (la app explica cómo compartir el pin). Sin red, avisa que el link corto necesita internet.
+
 ## No probado todavía
 - Modo bolsillo en teléfonos reales: que la pantalla no se apague y cuánta batería gasta.
 - Última ubicación conocida en una red saturada real.
@@ -50,6 +56,8 @@ Mejoras de preparación: invitación con pasos, aviso en Safari, mapa automátic
 - [ ] SMS: enviar desde A, pegar en B y navegar hacia ese punto.
 - [ ] iPhone en modo avión: cerrar la app, reabrirla y confirmar que los pedidos de ubicación y brújula aparecen y funcionan sin señal.
 - [ ] La pantalla no se apaga en el Modo Encuentro.
+- [ ] Link corto: en iPhone, compartir un pin de Google Maps (mantener apretado el lugar), pegarlo al crear el grupo y confirmar que el punto cae donde corresponde.
+- [ ] Brújula trabada: con modo avión, abrir Modo Encuentro, girar el teléfono y confirmar que la flecha gira. Si no, 5 toques en la distancia y mandar captura.
 - [ ] Brújula: guardar un punto, alejarse 100 m a pie y confirmar que la flecha apunta al punto, con el teléfono plano y levantado. Comparada con una brújula nativa magnética da unos 7° de diferencia, a propósito.
 - [ ] Instalar ya, cerrar todo, y el domingo abrir en modo avión: grupo, mapa y flecha siguen ahí.
 - [ ] Última ubicación: activarla en dos teléfonos y confirmar que cada uno ve al otro.

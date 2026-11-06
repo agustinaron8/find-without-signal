@@ -15,7 +15,7 @@ export function useWalk(position: Position | null, compassHeading: number | null
   useEffect(() => {
     if (!position) return;
     const { lat, lng, accuracy, t } = position;
-    samples.current = [...samples.current.filter((s) => t - s.t <= WALK_WINDOW_MS), { lat, lng, accuracy, t, heading: compass.current }];
+    samples.current = [...samples.current.filter((s) => t - s.t <= WALK_WINDOW_MS), { lat, lng, accuracy, t, heading: Number.isFinite(compass.current) ? compass.current : null }];
     const next = recentWalk(samples.current);
     setWalk(next);
     if (next?.compassError == null) return;

@@ -29,6 +29,8 @@ export function useGeolocation() {
       watchId = navigator.geolocation.watchPosition(
         ({ coords }) => {
           setError(null);
+          // One bad number would poison the filter, and with it every later position.
+          if (![coords.latitude, coords.longitude, coords.accuracy].every(Number.isFinite)) return;
           // Some browsers report NaN instead of null while standing still.
           const speed = Number.isFinite(coords.speed) ? coords.speed : null;
           const heading = Number.isFinite(coords.heading) ? coords.heading : null;

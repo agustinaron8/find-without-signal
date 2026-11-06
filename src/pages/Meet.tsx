@@ -29,12 +29,12 @@ import {
   magneticDeclination,
   nextPlanTime,
   normalizeDegrees,
-  parseCoords,
   SAVE_MAX_ACCURACY_M,
   shouldRecordTrackPoint,
   walkTrend,
 } from '../lib/geo';
 import { formatAge, LOCATION_STALE_MS, STATUSES } from '../lib/lastKnown';
+import { resolveCoords, SHORT_LINK_MESSAGES } from '../lib/mapsLink';
 import { groupRoster, MEMBER_FILTER_FROM, sortMembers } from '../lib/members';
 
 const MapView = lazy(() => import('../components/MapView'));
@@ -43,6 +43,10 @@ const TRACK_START_ID = 'track-start';
 const MEMBER_PREFIX = 'member-';
 const PERSONAL_COLOR = '#16a34a';
 const GPS_HEADING_MIN_SPEED_MS = 0.5;
+// Faster than walking: in a vehicle the GPS course is right and the compass is thrown off by metal.
+const GPS_HEADING_FIRST_SPEED_MS = 2;
+const DEBUG_TAPS = 5;
+const DEBUG_TAP_WINDOW_MS = 2000;
 const TRACK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const GPS_STALE_MS = 30000;
 const ROUGH_ARROW_RATIO = 0.5;
@@ -83,6 +87,7 @@ export default function Meet() {
   const [sheetError, setSheetError] = useState('');
   const [now, setNow] = useState(() => new Date());
   const [showDebug, setShowDebug] = useState(false);
+  const debugTaps = useRef<number[]>([]);
   const lastTrackRef = useRef<TrackPoint | undefined>(undefined);
   const arrivedAt = useRef<string | null>(null);
 
@@ -163,11 +168,25 @@ export default function Meet() {
     );
   }
 
-  const movingHeading = position?.speed != null && position.speed > GPS_HEADING_MIN_SPEED_MS ? position.heading : null;
-  const heading = walk.correctedCompass ?? walk.course ?? movingHeading;
-  const headingSource = walk.correctedCompass !== null ? 'brújula' : walk.course !== null ? 'marcha' : movingHeading !== null ? 'GPS' : 'ninguna';
+  const speed = position?.speed ?? 0;
+  const gpsHeading = position?.heading ?? null;
+  const vehicleHeading = speed > GPS_HEADING_FIRST_SPEED_MS ? gpsHeading : null;
+  const movingHeading = speed > GPS_HEADING_MIN_SPEED_MS ? gpsHeading : null;
+  const heading = vehicleHeading ?? walk.correctedCompass ?? walk.course ?? movingHeading;
+  const headingSource =
+    vehicleHeading !== null ? 'GPS rápido' : walk.correctedCompass !== null ? 'brújula' : walk.course !== null ? 'marcha' : movingHeading !== null ? 'GPS' : 'ninguna';
+  const tapDistance = () => {
+    const at = Date.now();
+    debugTaps.current = [...debugTaps.current.filter((t) => at - t < DEBUG_TAP_WINDOW_MS), at];
+    if (debugTaps.current.length < DEBUG_TAPS) return;
+    debugTaps.current = [];
+    setShowDebug(!showDebug);
+  };
   const distance = position && destination ? haversine(position, destination) : null;
   const toTarget = position && destination ? bearing(position, destination) : null;
+  const rawRotation = toTarget !== null && heading !== null ? normalizeDegrees(toTarget - heading) : null;
+  // A NaN rotation is dropped by CSS and leaves the arrow frozen pointing up, which looks valid.
+  const rotation = rawRotation !== null && Number.isFinite(rawRotation) ? rawRotation : null;
   const poorFix = !!position && isPoorFix(position.accuracy);
   const gpsAge = position ? now.getTime() - position.t : 0;
   const gpsStale = gpsAge > GPS_STALE_MS;
@@ -221,8 +240,9 @@ export default function Meet() {
     savePersonal(draftName.trim() || 'Mi lugar', position.lat, position.lng, position.accuracy);
   };
 
-  const savePasted = () => {
-    const coords = parseCoords(pasted);
+  const savePasted = async () => {
+    const coords = await resolveCoords(pasted);
+    if (typeof coords === 'string') return setSheetError(SHORT_LINK_MESSAGES[coords]);
     if (!coords) return setSheetError('No encontré coordenadas en ese mensaje.');
     const time = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
     savePersonal(`${draftName.trim() || 'Ubicación recibida'} – ${time}`, coords.lat, coords.lng);
@@ -293,15 +313,15 @@ export default function Meet() {
             </>
           ) : (
             <>
-              {toTarget !== null && heading !== null && (
+              {rotation !== null && (
                 <>
-                  <Compass rotation={normalizeDegrees(toTarget - heading)} />
+                  <Compass rotation={rotation} />
                   <p data-testid="arrow-hint" className="font-semibold">
                     Caminá hacia donde apunta la flecha
                   </p>
                 </>
               )}
-              {heading !== null && headingSource !== 'brújula' && (
+              {rotation !== null && (headingSource === 'marcha' || headingSource === 'GPS') && (
                 <p data-testid="no-compass" className="font-semibold text-amber-800">
                   {denied ? 'Sin permiso de brújula' : 'Sin brújula'}: la flecha solo vale mientras caminás, y según tu dirección de marcha
                 </p>
@@ -326,12 +346,12 @@ export default function Meet() {
                   La brújula estaba desviada: la corregí con tu dirección al caminar
                 </p>
               )}
-              {toTarget !== null && heading === null && (
+              {toTarget !== null && rotation === null && (
                 <p className="text-lg font-semibold">
                   {denied || !needsPermission ? 'Caminá unos pasos para orientar la flecha' : 'Activá la brújula para ver la flecha'}
                 </p>
               )}
-              {toTarget !== null && (heading === null || poorFix) && (
+              {toTarget !== null && (rotation === null || poorFix) && (
                 <p data-testid="cardinal" className="text-2xl font-bold">
                   Al {cardinalName(toTarget)}, {Math.round(toTarget)}°
                 </p>
@@ -351,8 +371,8 @@ export default function Meet() {
           )}
 
           {distance !== null && (
-            // Tapping it opens the raw sensor values, to diagnose a wrong arrow on a real phone.
-            <button type="button" onClick={() => setShowDebug(!showDebug)}>
+            // Five quick taps open the raw sensor values, to diagnose a wrong arrow on a real phone.
+            <button type="button" onClick={tapDistance}>
               <p data-testid="distance" className="text-6xl font-black tracking-tight">
                 {poorFix && '≈ '}
                 {formatDistance(distance)}
@@ -363,6 +383,10 @@ export default function Meet() {
             <CompassDebug
               raw={headingDebug.current}
               source={headingSource}
+              rotation={rotation}
+              speed={position?.speed ?? null}
+              gpsHeading={gpsHeading}
+              permission={denied ? 'negado' : needsPermission ? 'falta pedir' : 'concedido'}
               magnetic={magneticHeading}
               offset={walk.offset}
               heading={heading}

@@ -4,6 +4,10 @@ import type { LatLng } from '../lib/geo';
 interface Props {
   raw: HeadingDebug | null;
   source: string;
+  rotation: number | null;
+  speed: number | null;
+  gpsHeading: number | null;
+  permission: string;
   magnetic: number | null;
   offset: number;
   heading: number | null;
@@ -14,9 +18,11 @@ interface Props {
 
 const num = (value: number | null | undefined, digits = 0) => (typeof value === 'number' ? value.toFixed(digits) : '–');
 
-export default function CompassDebug({ raw, source, magnetic, offset, heading, toTarget, position, destination }: Props) {
+export default function CompassDebug({ raw, source, rotation, speed, gpsHeading, permission, magnetic, offset, heading, toTarget, position, destination }: Props) {
   const rows: [string, string][] = [
     ['Fuente', source],
+    ['Permiso brújula', permission],
+    ['Último dato brújula', raw ? `hace ${((performance.now() - raw.at) / 1000).toFixed(1)} s` : 'nunca'],
     ['Evento', raw?.type ?? 'ninguno'],
     ['iOS rumbo / error', `${num(raw?.ios)} / ${num(raw?.iosError)}`],
     ['alpha beta gamma', `${num(raw?.alpha)} ${num(raw?.beta)} ${num(raw?.gamma)}`],
@@ -27,6 +33,8 @@ export default function CompassDebug({ raw, source, magnetic, offset, heading, t
     ['Corrección por marcha', num(offset)],
     ['Rumbo final', num(heading)],
     ['Rumbo al destino', num(toTarget)],
+    ['Rotación flecha', num(rotation)],
+    ['Velocidad / rumbo GPS', `${num(speed, 1)} m/s / ${num(gpsHeading)}`],
     ['Yo', position ? `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)} ±${Math.round(position.accuracy)}` : '–'],
     ['Destino', destination ? `${destination.lat.toFixed(5)}, ${destination.lng.toFixed(5)} ±${num(destination.accuracy)}` : '–'],
   ];

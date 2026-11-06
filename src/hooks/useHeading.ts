@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { angleBetween, effectiveScreenAngle, headingFromOrientation, normalizeDegrees, type OrientationReading } from '../lib/geo';
 
 const SMOOTHING_MS = 250;
+const MAX_SMOOTHING_MS = 1000;
+const SMOOTHING_PER_JITTER_DEG = 25;
+// iOS sends readings many times per second, so a silence this long means the sensor stopped.
+const STALL_MS = 3000;
 const MIN_CHANGE_DEG = 1;
 // iOS reports its error in degrees; past this the arrow can point to the wrong side of a person.
 const WEAK_COMPASS_DEG = 25;
@@ -27,6 +31,7 @@ export interface HeadingDebug {
   absolute: boolean;
   reportedAngle: number;
   usedAngle: number;
+  at: number;
 }
 
 export function useHeading() {
@@ -41,6 +46,7 @@ export function useHeading() {
     let smoothed: number | null = null;
     let shown: number | null = null;
     let lastEvent = 0;
+    let jitter = 0;
 
     const onOrientation = (event: DeviceOrientationEvent) => {
       const iosError = (event as OrientationReading).webkitCompassAccuracy;
@@ -57,6 +63,7 @@ export function useHeading() {
           absolute: event.absolute,
           reportedAngle: reportedAngle(),
           usedAngle: screenAngle(),
+          at: performance.now(),
         };
       }
       if (reading === null) {
@@ -70,10 +77,16 @@ export function useHeading() {
       }
       setWeak(iosError !== undefined && iosError > WEAK_COMPASS_DEG);
       const now = performance.now();
-      smoothed =
-        smoothed === null
-          ? reading
-          : normalizeDegrees(smoothed + angleBetween(reading, smoothed) * (1 - Math.exp((lastEvent - now) / SMOOTHING_MS)));
+      if (smoothed === null || !Number.isFinite(smoothed)) {
+        smoothed = reading;
+        jitter = 0;
+      } else {
+        const delta = angleBetween(reading, smoothed);
+        // A shaky sensor gets a calmer arrow; a steady one stays quick to follow turns.
+        jitter = jitter * 0.9 + Math.abs(delta) * 0.1;
+        const tau = Math.min(MAX_SMOOTHING_MS, SMOOTHING_MS + jitter * SMOOTHING_PER_JITTER_DEG);
+        smoothed = normalizeDegrees(smoothed + delta * (1 - Math.exp((lastEvent - now) / tau)));
+      }
       lastEvent = now;
       // Sensors fire about 60 times per second; redrawing for noise only spends battery.
       if (shown === null || Math.abs(angleBetween(smoothed, shown)) >= MIN_CHANGE_DEG) {
@@ -92,12 +105,25 @@ export function useHeading() {
       window.removeEventListener('deviceorientationabsolute', onOrientation as EventListener);
       window.removeEventListener('deviceorientation', onOrientation);
     };
-    const onVisibility = () => (document.hidden ? stop() : start());
+    const onVisibility = () => {
+      lastEvent = performance.now();
+      return document.hidden ? stop() : start();
+    };
+
+    // A heading that stops updating would leave the arrow frozen on an old direction.
+    const watchdog = window.setInterval(() => {
+      if (document.hidden || smoothed === null || performance.now() - lastEvent < STALL_MS) return;
+      smoothed = shown = null;
+      setHeading(null);
+      // On iPhone a new grant from the next tap brings the readings back.
+      if (typeof orientationApi()?.requestPermission === 'function') setGranted(false);
+    }, 1000);
 
     start();
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       stop();
+      window.clearInterval(watchdog);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
